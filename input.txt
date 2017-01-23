@@ -1,1 +1,1 @@
-0x54 + id * id - id * id * id
+id * id - id * id * id

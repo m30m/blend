@@ -1,3 +1,6 @@
+import java.io.File;
+import java.io.FileReader;
+import java.io.Reader;
 import java.util.Stack;
 
 public class Parser 
@@ -14,8 +17,16 @@ public class Parser
 		{
 			this.parseTable = parseTable;
 			this.symbols = symbols;
-	
-			scanner = new Scanner(inputFile);
+
+			File f = new File(inputFile);
+			if (!f.exists())
+				throw new Exception("File does not exist: " + f);
+			if (!f.isFile())
+				throw new Exception("Should not be a directory: " + f);
+			if (!f.canRead())
+				throw new Exception("Can not read input file: " + f);
+			FileReader reader = new FileReader(f);
+			scanner = new Scanner(reader);
 			cg = new CodeGenerator(scanner);
 		}
 		catch (Exception e)
@@ -26,7 +37,7 @@ public class Parser
 
 	public int LineNumber()
 	{
-		return scanner.lineNumber; // Or any other name you used in your Scanner
+		return scanner.lineNumber(); // Or any other name you used in your Scanner
 	}
 
 	public void Parse()
@@ -44,7 +55,7 @@ public class Parser
 				{
 	                case PTBlock.ActionType.Error:
 	                    {
-	                        throw new Exception(String.format("Compile Error (" + token + ") at line " + scanner.lineNumber + " @ " + curNode));
+	                        throw new Exception(String.format("Compile Error (" + token + ") at line " + scanner.lineNumber() + " @ " + curNode));
 	                    }
 					case PTBlock.ActionType.Shift:
 						{
@@ -65,7 +76,7 @@ public class Parser
 						{
 							if (parseStack.size() == 0)
 	                        {
-		                        throw new Exception(String.format("Compile Error (" + token + ") at line " + scanner.lineNumber + " @ " + curNode));
+		                        throw new Exception(String.format("Compile Error (" + token + ") at line " + scanner.lineNumber() + " @ " + curNode));
 	                        }
 	
 							curNode = parseStack.pop();

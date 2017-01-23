@@ -3,17 +3,27 @@
 
 %%
 
-%class Lexer
+%public
+%class Scanner
+%function NextToken
 %type String
 %unicode
 %line
 %column
 
 %{
-  StringBuffer string = new StringBuffer();
+    StringBuffer string = new StringBuffer();
 
-
+    public int lineNumber() {
+        return yyline;
+    }
 %}
+
+%eofval{
+    return "$";
+%eofval}
+
+
 
 LineTerminator = \r|\n|\r\n
 InputCharacter = [^\r\n]
@@ -39,31 +49,31 @@ DecIntegerLiteral = 0 | [1-9][0-9]*
 %%
 
 /* keywords */
-<YYINITIAL> "abstract"           { return string.toString(); }
-<YYINITIAL> "boolean"            { return string.toString(); }
-<YYINITIAL> "break"              { return string.toString(); }
+<YYINITIAL> "abstract"           { return yytext(); }
+<YYINITIAL> "boolean"            { return yytext(); }
+<YYINITIAL> "break"              { return yytext(); }
 
 <YYINITIAL> {
   /* identifiers */
-  {Identifier}                   { return "ID"; } // { return "symbol(sym.IDENTIFIER);" }
+  {Identifier}                   { return "id"; } // { return "symbol(sym.IDENTIFIER);" }
 
   /* literals */
   {DecIntegerLiteral}            { return "integer"; } //{ return "symbol(sym.INTEGER_LITERAL);" }
   \"                             { string.setLength(0); yybegin(STRING); }
 
   /* operators */
-  "="                            { return "ASSIGNMENT"; }
-  "=="                           { return "EQUAL"; }
-  "/"                            { return "BIN_DIV"; }
-  "%"                            { return "BIN_MOD"; }
-  "*"                            { return "BIN_MUL"; }
-  "-"                            { return "BIN_SUB"; }
-  "&"                            { return "BIT_AND"; }
-  "^"                            { return "BIT_XOR"; }
-  "|"                            { return "BIT_OR"; }
-  "||"                           { return "BIN_OR"; }
-  "&&"                           { return "BIN_AND"; }
-  "+"                            { return "BIN_ADD"; }
+  "="                            { return yytext(); }
+  "=="                           { return yytext(); }
+  "/"                            { return yytext(); }
+  "%"                            { return yytext(); }
+  "*"                            { return yytext(); }
+  "-"                            { return yytext(); }
+  "&"                            { return yytext(); }
+  "^"                            { return yytext(); }
+  "|"                            { return yytext(); }
+  "||"                           { return yytext(); }
+  "&&"                           { return yytext(); }
+  "+"                            { return yytext(); }
 
 
   /* comments */

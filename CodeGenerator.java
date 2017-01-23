@@ -164,8 +164,8 @@ public class CodeGenerator {
                 return ">";
             case "MEQ":
                 return ">=";
-            return "NEQ":
-                return "!"
+            case "NEQ":
+                return "!";
         }
         return "ERR";
     }

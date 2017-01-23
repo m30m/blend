@@ -1,6 +1,6 @@
 public class Program {
     // Address of PGen output table.
-    public static final String stPath = "/home/khashkhash/Desktop/Compiler/PGen/exp1.npt";
+    public static final String stPath = "exp1.npt";
 
     public static String inputPath = "";
     public static String outputPath = "";

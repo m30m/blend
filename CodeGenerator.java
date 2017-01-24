@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.util.Stack;
 
@@ -90,16 +91,15 @@ public class CodeGenerator {
         code = code + ins;
     }
 
-    public void Generate(String sem) {
+    public void Generate(String sem, Token currentToken) {
         System.out.println(sem); // Just for debug
 
         switch (sem) {
             case "NoSem":
                 return;
             case "push": {
-                Variable v = getTempInt();
-                Variable five = new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INTEGER, 5);
-                makeIns(":=", v, five);
+                assert currentToken instanceof Literal;
+                Variable v = new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INTEGER, Integer.parseInt(((Literal) currentToken).value));
                 sstack.push(v);
                 break;
             }
@@ -132,8 +132,7 @@ public class CodeGenerator {
     }
 
     private String opToString(String op) {
-        switch (op)
-        {
+        switch (op) {
             case "BIN_DIV":
                 return "/";
             case "BIN_MOD":
@@ -191,6 +190,7 @@ public class CodeGenerator {
         // If you want, you can output a code line just when it is generated (strongly NOT recommended!!)
         try {
             PrintWriter writer = new PrintWriter(outputName, "UTF-8");
+            makeIns("wi", (Variable) sstack.pop());
             writer.print(code);
             writer.close();
         } catch (IOException e) {

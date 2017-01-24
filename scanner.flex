@@ -63,7 +63,7 @@ CharLiteral = '[^']' | '\''
 <YYINITIAL> "else"                      { return new Token(yytext()); }
 <YYINITIAL> "endcase"                   { return new Token(yytext()); }
 <YYINITIAL> "environment"               { return new Token(yytext()); }
-<YYINITIAL> "false"                     { return new Token(yytext()); }
+<YYINITIAL> "false"                     { return new Literal("const", "BOOL", yytext()); }
 <YYINITIAL> "function"                  { return new Token(yytext()); }
 <YYINITIAL> "goto"                      { return new Token(yytext()); }
 <YYINITIAL> "if"                        { return new Token(yytext()); }
@@ -79,7 +79,7 @@ CharLiteral = '[^']' | '\''
 <YYINITIAL> "return"                    { return new Token(yytext()); }
 <YYINITIAL> "string"                    { return new Type("type", yytext()); }
 <YYINITIAL> "structure"                 { return new Token(yytext()); }
-<YYINITIAL> "true"                      { return new Token(yytext()); }
+<YYINITIAL> "true"                      { return new Literal("const", "BOOL", yytext()); }
 <YYINITIAL> "void"                      { return new Token(yytext()); }
 <YYINITIAL> "while"                     { return new Token(yytext()); }
 

@@ -11,8 +11,23 @@ public class Token {
     }
 }
 
-class Identifier extends Token
-{
+class Identifier extends Token {
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Identifier that = (Identifier) o;
+
+        return id != null ? id.equals(that.id) : that.id == null;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
+    }
+
     String id;
 
     public Identifier(String parser_token, String id) {
@@ -21,8 +36,7 @@ class Identifier extends Token
     }
 }
 
-class Literal extends Token
-{
+class Literal extends Token {
     String type;
     String value;
 
@@ -33,12 +47,29 @@ class Literal extends Token
     }
 }
 
-class Type extends Token
-{
+class Type extends Token {
     String type;
 
     public Type(String parser_token, String type) {
         super(parser_token);
         this.type = type;
+    }
+
+    public int getByteSize() {
+        switch (type) {
+            case "string":
+                return 4;
+            case "int":
+                return 4;
+            case "real":
+                return 4;
+            case "char":
+                return 1;
+            case "bool":
+                return 1;
+            case "long":
+                return 8;
+        }
+        throw new RuntimeException("Unknown type");
     }
 }

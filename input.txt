@@ -1,1 +1,10 @@
-int a
+function (int) main()
+{
+int id := 2;
+
+id :=2069;
+int boz := 4;
+bool zas := false;
+
+id :=234235;
+}

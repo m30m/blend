@@ -1,10 +1,10 @@
+function (int) ff()
+{
+write(4);
+}
+
 function (int) main()
 {
-int id := 2;
-
-id :=2069;
-int boz := 4;
-bool zas := false;
-
-id :=234235;
+write(3);
+ff();
 }

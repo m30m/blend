@@ -22,6 +22,24 @@ class Variable {
         this.value = value;
     }
 
+    public int getByteSize() {
+        switch (type) {
+            case STRING:
+                return 4;
+            case INT:
+                return 4;
+            case REAL:
+                return 4;
+            case CHAR:
+                return 1;
+            case BOOL:
+                return 1;
+//            case "long": // FIXME
+//                return 8;
+        }
+        throw new RuntimeException("Unknown type");
+    }
+
     @Override
     public String toString() {
         String modeStr = modeToStr(mode);
@@ -66,25 +84,40 @@ class Variable {
 
 class Function {
     ArrayList<Type> return_types;
-    ArrayList<Type> arguments;//FIXME
+    ArrayList<Variable> argsOrder;//FIXME
     HashMap<Identifier, Variable> vars;
     int localVarsSize = 0;
     Identifier id;
     int start_PC;
+    Variable return_addr;
+    Variable old_base_pointer;
 
     public Function() {
         return_types = new ArrayList<>();
         vars = new HashMap<>();
+        argsOrder = new ArrayList<>();
+        old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -4);
+        return_addr = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -8);
+
+        localVarsSize += 8;//return address and old base pointer
+    }
+
+    public void addArgument(Type t, Identifier argId) {
+        if (vars.containsKey(argId))
+            throw new RuntimeException("Arguments with the same name!");
+        localVarsSize += t.getByteSize();
+        Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
+        vars.put(argId, arg);
+        argsOrder.add(arg);
+
     }
 
     public Variable addVariable(Type t, Identifier varId) {
         if (vars.containsKey(varId))
             throw new RuntimeException("Duplicate declaration of " + varId.id + " in function " + id.id);
-
-
-        Variable v = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), localVarsSize);
-        vars.put(varId, v);
         localVarsSize += t.getByteSize();
+        Variable v = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
+        vars.put(varId, v);
         return v;
     }
 
@@ -111,6 +144,7 @@ public class CodeGenerator {
 
     private int tmp_addr;
     private Variable lastVariable;
+    private boolean insideFuncDef;
 
     public CodeGenerator(Scanner scanner) {
         this.scanner = scanner;
@@ -130,13 +164,13 @@ public class CodeGenerator {
         return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, i);
     }
 
-    public void makeIns(String opCode, Variable opr3, Variable opr1, Variable opr2) {
+    public void makeIns(String opCode, Variable opr1, Variable opr2, Variable opr3) {
         String ins = opCode + " " + opr1 + " " + opr2 + " " + opr3 + "\n";
         instructions.add(ins);
         PC++;
     }
 
-    public void makeIns(String opCode, Variable opr2, Variable opr1) {
+    public void makeIns(String opCode, Variable opr1, Variable opr2) {
         String ins = opCode + " " + opr1 + " " + opr2 + "\n";
         instructions.add(ins);
         PC++;
@@ -174,7 +208,7 @@ public class CodeGenerator {
                 Variable tempInt = getTempInt();
                 Variable op1 = (Variable) sstack.pop();
                 Variable op2 = (Variable) sstack.pop();
-                makeIns(opToString(sem), tempInt, op1, op2);
+                makeIns(opToString(sem), op1, op2, tempInt);
                 sstack.push(tempInt);
                 break;
             }
@@ -194,8 +228,12 @@ public class CodeGenerator {
             case "varDeclare": {
                 Type t = (Type) sstack.pop();
                 Identifier id = (Identifier) currentToken;
-                Variable variable = currentFunction.addVariable(t, id);
-                this.lastVariable = variable;
+                if (insideFuncDef) {
+                    currentFunction.addArgument(t, id);
+                } else {
+                    Variable variable = currentFunction.addVariable(t, id);
+                    this.lastVariable = variable;
+                }
                 break;
             }
             case "assign": {
@@ -209,17 +247,20 @@ public class CodeGenerator {
                 break;
             }
             case "assignDeclared": {
+                if (insideFuncDef)
+                    throw new RuntimeException("Can't assign variable inside declaration");
                 makeIns(":=", (Variable) sstack.pop(), lastVariable);
                 break;
             }
             case "startFunc": {
                 sstack.push("start_function");
+                insideFuncDef = true;
                 break;
             }
-            case "finFunc": {
+            case "finFuncSignature": {
                 Function f = new Function();
 
-                //FIXME handle input arguments
+
                 f.id = (Identifier) sstack.pop();
                 if (functionsHashMap.containsKey(f.id))
                     throw new RuntimeException("Duplicate function decleration with name: " + f.id);
@@ -227,19 +268,67 @@ public class CodeGenerator {
                 {
                     f.return_types.add(0, (Type) sstack.pop());
                 }
-                sstack.pop();
-                sstack.push(f);
                 functionsHashMap.put(f.id, f);
                 currentFunction = f;
-                f.start_PC = this.PC + 1;
+                f.start_PC = this.PC;
+                break;
+            }
+            case "finFunc": {
+                Function f = new Function();
+                //FIXME handle input arguments
+
+                sstack.pop(); // pop "start_function"
+                sstack.push(f);
+                insideFuncDef = false;
                 break;
             }
             case "finFuncBody": {
-                //FIXME
+                pop(currentFunction.localVarsSize);
+                makeIns("wi", currentFunction.return_addr);
+                makeIns("jmp", currentFunction.return_addr);
+                currentFunction = null;
                 break;
             }
-            case "return":
+            case "functionCall":
             {
+                sstack.push("start_function_args");
+                break;
+            }
+            case "finishFuncArgs": {
+                ArrayList<Variable> args = new ArrayList<>();
+                while (!sstack.peek().equals("start_function_args"))//reading return types
+                {
+                    Variable var = (Variable) sstack.pop();
+                    args.add(var);
+                }
+                sstack.pop();//popping start_function_args
+                Identifier functionName = (Identifier) sstack.pop();
+                if (functionName.id.equals("write")) {
+                    if (args.size() != 1)
+                        throw new RuntimeException("write function gets only one parameter");
+                    Variable writeVar = args.get(0);
+                    switch (writeVar.type) {
+                        case INT:
+                            makeIns("wi", writeVar);
+                            break;
+                        case REAL:
+                            makeIns("wf", writeVar);
+                            break;
+                        case CHAR:
+                            makeIns("wt", writeVar);
+                            break;
+                        default:
+                            throw new RuntimeException("Can't write such variable");
+                    }
+                    break;
+                }
+                if (!functionsHashMap.containsKey(functionName))
+                    throw new RuntimeException("Function " + functionName.id + " doesn't exist");
+                Function function = functionsHashMap.get(functionName);
+                callFunction(function, args);
+                break;
+            }
+            case "return": {
 
                 break;
             }
@@ -247,6 +336,7 @@ public class CodeGenerator {
             case "UNARY_NOT":
             case "COMPLEMENT":
             case "NEGATION":
+            case "pushArg":
                 return;
             default: {
                 System.out.println("Unknown sem = " + sem);
@@ -284,23 +374,30 @@ public class CodeGenerator {
         throw new RuntimeException("Unknown type for const: " + currentToken.type);
     }
 
+    private void pop(int size) {
+        makeIns("+", SP, makeConst(size), SP);
+    }
     private void push(Variable v) {
-        makeIns("-", SP, new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, 4), SP);
+        makeIns("-", SP, makeConst(v.getByteSize()), SP);
         makeIns(":=", v, SP_place);
     }
 
     private void callFunction(Function f, ArrayList<Variable> arguments) {
-        if (arguments.size() > 0) {
-
-            //Check argument types and lenght with function
-            for (Variable argument : arguments) {
-                push(argument);
-            }
-            throw new NotImplementedException();//FIXME
-        }
-        makeIns(":=pc", AX);
-        makeIns("+", AX, makeConst(8), AX);
+        makeIns(":=sp", AX);
+        makeIns("sp:=", SP);
         push(AX);
+        makeIns(":=", makeConst(PC), AX);
+        makeIns("+", AX, makeConst(1 + 1 + 2 + 2 * arguments.size() + 1), AX);
+        push(AX);
+        //Check argument types and length with function
+        if (arguments.size() != f.argsOrder.size())
+            throw new RuntimeException("Arguments number is not correct");
+        for (int i = 0; i < arguments.size(); i++) {
+            if (arguments.get(i).type != f.argsOrder.get(i).type)
+                throw new RuntimeException("Argument types are not the same");
+            push(arguments.get(i));
+        }
+
         makeIns("jmp", makeConst(f.start_PC));
     }
 
@@ -372,7 +469,7 @@ public class CodeGenerator {
             String ins = "jmp " + makeConst(PC) + "\n";
             instructions.set(1, ins);
             callFunction(functionsHashMap.get(new Identifier("id", "main")), new ArrayList<>());
-
+            makeIns(":=", AX, AX);//dummy operation
             for (String instruction : instructions) {
                 writer.print(instruction);
             }

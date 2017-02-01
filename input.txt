@@ -1,10 +1,15 @@
-function (int) ff()
+function (int) fg(int a)
 {
-write(4);
+    write(a);
+    fg(a);
 }
 
+function (int) boz(int a)
+{
+write(a);
+}
 function (int) main()
 {
-write(3);
-ff();
+write(3245/2);
+fg(3245/2);
 }

@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -83,6 +81,7 @@ class Variable {
 
 
 class Function {
+    int argVarsSize;
     ArrayList<Type> return_types;
     ArrayList<Variable> argsOrder;//FIXME
     HashMap<Identifier, Variable> vars;
@@ -96,17 +95,17 @@ class Function {
         return_types = new ArrayList<>();
         vars = new HashMap<>();
         argsOrder = new ArrayList<>();
-        old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -4);
-        return_addr = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -8);
-
-        localVarsSize += 8;//return address and old base pointer
+        old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 0);
+        return_addr = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 4);
+        argVarsSize = 8;//return address and old base pointer
+        localVarsSize = 0;
     }
 
     public void addArgument(Type t, Identifier argId) {
         if (vars.containsKey(argId))
             throw new RuntimeException("Arguments with the same name!");
-        localVarsSize += t.getByteSize();
-        Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
+        Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), argVarsSize);
+        argVarsSize += t.getByteSize();
         vars.put(argId, arg);
         argsOrder.add(arg);
 
@@ -119,6 +118,11 @@ class Function {
         Variable v = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
         vars.put(varId, v);
         return v;
+    }
+
+    Variable getTempInt() {
+        localVarsSize += 4;
+        return new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -localVarsSize);
     }
 
     public Variable getVariable(Identifier varId) {
@@ -137,12 +141,12 @@ public class CodeGenerator {
     Variable SP;
     Variable SP_place;
     Variable AX;
+    Variable FUNCTION_RESULT;
 
     Stack<Object> sstack;
 
     // Define any variables needed for code generation
 
-    private int tmp_addr;
     private Variable lastVariable;
     private boolean insideFuncDef;
 
@@ -156,8 +160,9 @@ public class CodeGenerator {
         makeIns(":=", makeConst(1000 * 1000), SP);
         this.SP_place = new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, Variable.TYPE.INT, 0);
         this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 4);
+        this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 8);
         this.currentFunction = null;
-        makeIns("jmp", makeConst(1000));
+        makeIns("jmp", makeConst(0));//the value of jmp is not important since it will be overwritten in the end
     }
 
     private Variable makeConst(int i) {
@@ -165,21 +170,33 @@ public class CodeGenerator {
     }
 
     public void makeIns(String opCode, Variable opr1, Variable opr2, Variable opr3) {
-        String ins = opCode + " " + opr1 + " " + opr2 + " " + opr3 + "\n";
+        String ins = getIns(opCode, opr1, opr2, opr3);
         instructions.add(ins);
         PC++;
+    }
+
+    private String getIns(String opCode, Variable opr1, Variable opr2, Variable opr3) {
+        return opCode + " " + opr1 + " " + opr2 + " " + opr3 + "\n";
     }
 
     public void makeIns(String opCode, Variable opr1, Variable opr2) {
-        String ins = opCode + " " + opr1 + " " + opr2 + "\n";
+        String ins = getIns(opCode, opr1, opr2);
         instructions.add(ins);
         PC++;
     }
 
+    private String getIns(String opCode, Variable opr1, Variable opr2) {
+        return opCode + " " + opr1 + " " + opr2 + "\n";
+    }
+
     public void makeIns(String opCode, Variable opr1) {
-        String ins = opCode + " " + opr1 + "\n";
+        String ins = getIns(opCode, opr1);
         instructions.add(ins);
         PC++;
+    }
+
+    private String getIns(String opCode, Variable opr1) {
+        return opCode + " " + opr1 + "\n";
     }
 
     public void Generate(String sem, Token currentToken) {
@@ -205,9 +222,9 @@ public class CodeGenerator {
             case "BIN_OR":
             case "BIN_ADD": {
                 //TODO:Check type
-                Variable tempInt = getTempInt();
-                Variable op1 = (Variable) sstack.pop();
+                Variable tempInt = currentFunction.getTempInt();
                 Variable op2 = (Variable) sstack.pop();
+                Variable op1 = (Variable) sstack.pop();
                 makeIns(opToString(sem), op1, op2, tempInt);
                 sstack.push(tempInt);
                 break;
@@ -217,7 +234,10 @@ public class CodeGenerator {
                 break;
             }
             case "pushId": {
-                sstack.push(currentToken);
+                if (currentFunction != null && currentFunction.vars.containsKey(currentToken))
+                    sstack.push(currentFunction.vars.get(currentToken));
+                else
+                    sstack.push(currentToken);
                 break;
             }
             case "pushconst"://FIXME make it camel case
@@ -271,11 +291,11 @@ public class CodeGenerator {
                 functionsHashMap.put(f.id, f);
                 currentFunction = f;
                 f.start_PC = this.PC;
+                makeIns("-", SP, makeConst(0), SP);
                 break;
             }
             case "finFunc": {
-                Function f = new Function();
-                //FIXME handle input arguments
+                Function f = new Function();//FIXME: This is bullshit
 
                 sstack.pop(); // pop "start_function"
                 sstack.push(f);
@@ -284,13 +304,14 @@ public class CodeGenerator {
             }
             case "finFuncBody": {
                 pop(currentFunction.localVarsSize);
-                makeIns("wi", currentFunction.return_addr);
-                makeIns("jmp", currentFunction.return_addr);
+                instructions.set(currentFunction.start_PC, getIns("-", SP, makeConst(currentFunction.localVarsSize), SP));
+                makeIns(":=", currentFunction.return_addr, AX);
+                makeIns("sp:=", currentFunction.old_base_pointer);
+                makeIns("jmp", AX);
                 currentFunction = null;
                 break;
             }
-            case "functionCall":
-            {
+            case "functionCall": {
                 sstack.push("start_function_args");
                 break;
             }
@@ -377,27 +398,25 @@ public class CodeGenerator {
     private void pop(int size) {
         makeIns("+", SP, makeConst(size), SP);
     }
+
     private void push(Variable v) {
         makeIns("-", SP, makeConst(v.getByteSize()), SP);
         makeIns(":=", v, SP_place);
     }
 
     private void callFunction(Function f, ArrayList<Variable> arguments) {
-        makeIns(":=sp", AX);
-        makeIns("sp:=", SP);
-        push(AX);
-        makeIns(":=", makeConst(PC), AX);
-        makeIns("+", AX, makeConst(1 + 1 + 2 + 2 * arguments.size() + 1), AX);
-        push(AX);
         //Check argument types and length with function
         if (arguments.size() != f.argsOrder.size())
             throw new RuntimeException("Arguments number is not correct");
-        for (int i = 0; i < arguments.size(); i++) {
+        for (int i = arguments.size() - 1; i >= 0; i--) {
             if (arguments.get(i).type != f.argsOrder.get(i).type)
                 throw new RuntimeException("Argument types are not the same");
             push(arguments.get(i));
         }
-
+        makeIns(":=sp", AX);
+        push(makeConst(PC + 2 + 2 + 2));
+        push(AX);
+        makeIns("sp:=", SP);
         makeIns("jmp", makeConst(f.start_PC));
     }
 
@@ -437,16 +456,6 @@ public class CodeGenerator {
                 return "!";
         }
         return "ERR";
-    }
-
-    private Variable getTempInt() {
-        return new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, getTempAddr());
-    }
-
-    private int getTempAddr() {
-        int ans = tmp_addr;
-        tmp_addr += 4;
-        return ans;
     }
 
     public void FinishCode() // You may need this

@@ -1,15 +1,13 @@
-function (int) fg(int a)
+function (int) fibo(int x)
 {
-    write(a);
-    fg(a);
+    int a:=5;
+    return a;
 }
 
-function (int) boz(int a)
-{
-write(a);
-}
+
 function (int) main()
 {
-write(3245/2);
-fg(3245/2);
+    int a:=fibo(34);
+    a :=  a + a;
+    write(a);
 }

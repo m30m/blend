@@ -852,8 +852,13 @@ public class Scanner {
             { return new Token(yytext());
             }
           case 21: break;
-          case 4: 
-            { return new Identifier("id", yytext());
+          case 4:
+            {
+              if(Parser.cg.isStruct(yytext()))
+              {
+                return new Type("type",yytext());
+              }
+              return new Identifier("id", yytext());
             }
           case 22: break;
           case 5: 

@@ -85,7 +85,7 @@ CharLiteral = '[^']' | '\''
 
 <YYINITIAL> {
   /* identifiers */
-  {Identifier}                   { return new Identifier("id", yytext()); }
+  {Identifier}                   {if(Parser.cg.isStruct(yytext())){return new Type("type",yytext());}return new Identifier("id", yytext());; }
 
   /* literals */
   {HexIntegerLiteral}            { return new Literal("const", "HEX", yytext()); }

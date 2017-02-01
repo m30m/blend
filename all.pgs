@@ -15,8 +15,8 @@
         "end": 0,
         "token": "FUNC_DEF",
         "func": "",
-        "anchorX": 360.0,
-        "anchorY": 318.0,
+        "anchorX": 325.0,
+        "anchorY": 236.0,
         "isGraph": true,
         "isGlobal": false
       }
@@ -303,10 +303,10 @@
       {
         "start": 15,
         "end": 16,
-        "token": "E_BIN_ADDSUB",
+        "token": "E_BOOL_EQ1",
         "func": "",
-        "anchorX": 332.5,
-        "anchorY": 235.5,
+        "anchorX": 334.5,
+        "anchorY": 210.5,
         "isGraph": true,
         "isGlobal": false
       },
@@ -323,7 +323,7 @@
       {
         "start": 17,
         "end": 16,
-        "token": "E_BIN_ADDSUB",
+        "token": "E_BOOL_EQ1",
         "func": "BIT_AND",
         "anchorX": 489.0,
         "anchorY": 311.0,
@@ -922,7 +922,7 @@
         "start": 43,
         "end": 45,
         "token": "Expression",
-        "func": "addArg",
+        "func": "",
         "anchorX": 650.0,
         "anchorY": 205.5,
         "isGraph": true,
@@ -932,7 +932,7 @@
         "start": 43,
         "end": 47,
         "token": ")",
-        "func": "finishArgs",
+        "func": "finishFuncArgs",
         "anchorX": 548.5,
         "anchorY": 227.0,
         "isGraph": false,
@@ -972,9 +972,9 @@
         "start": 45,
         "end": 47,
         "token": ")",
-        "func": "finishArg",
-        "anchorX": 541.0,
-        "anchorY": 155.5,
+        "func": "finishFuncArgs",
+        "anchorX": 480.0,
+        "anchorY": 51.5,
         "isGraph": false,
         "isGlobal": false
       },
@@ -982,7 +982,7 @@
         "start": 46,
         "end": 45,
         "token": "Expression",
-        "func": "addArg",
+        "func": "",
         "anchorX": 602.5,
         "anchorY": 86.0,
         "isGraph": true,
@@ -1100,7 +1100,7 @@
         "start": 57,
         "end": 55,
         "token": ":\u003d",
-        "func": "",
+        "func": "setRHS",
         "anchorX": 272.0,
         "anchorY": 254.0,
         "isGraph": false,
@@ -1481,6 +1481,16 @@
         "isGlobal": false
       },
       {
+        "start": 74,
+        "end": 75,
+        "token": "CONDITIONAL",
+        "func": "finCondition",
+        "anchorX": 451.0,
+        "anchorY": 83.5,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
         "start": 76,
         "end": 75,
         "token": "ASSIGNMENT",
@@ -1568,5 +1578,347 @@
       }
     ],
     "start": 78
+  },
+  {
+    "name": "CONDITIONAL",
+    "nodes": [
+      {
+        "x": 349.0,
+        "y": 237.0,
+        "id": 81,
+        "isFinal": false
+      },
+      {
+        "x": 506.0,
+        "y": 230.0,
+        "id": 82,
+        "isFinal": false
+      },
+      {
+        "x": 631.0,
+        "y": 259.0,
+        "id": 83,
+        "isFinal": false
+      },
+      {
+        "x": 636.0,
+        "y": 330.0,
+        "id": 84,
+        "isFinal": false
+      },
+      {
+        "x": 559.0,
+        "y": 395.0,
+        "id": 85,
+        "isFinal": false
+      },
+      {
+        "x": 381.0,
+        "y": 403.0,
+        "id": 86,
+        "isFinal": true
+      },
+      {
+        "x": 387.0,
+        "y": 533.0,
+        "id": 87,
+        "isFinal": false
+      },
+      {
+        "x": 553.0,
+        "y": 534.0,
+        "id": 88,
+        "isFinal": true
+      }
+    ],
+    "edges": [
+      {
+        "start": 81,
+        "end": 82,
+        "token": "if",
+        "func": "",
+        "anchorX": 427.0,
+        "anchorY": 234.5,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 82,
+        "end": 83,
+        "token": "(",
+        "func": "",
+        "anchorX": 549.0,
+        "anchorY": 230.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 83,
+        "end": 84,
+        "token": "Expression",
+        "func": "",
+        "anchorX": 633.5,
+        "anchorY": 294.5,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 84,
+        "end": 85,
+        "token": ")",
+        "func": "finIfCondition",
+        "anchorX": 597.5,
+        "anchorY": 362.5,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 85,
+        "end": 86,
+        "token": "BLOCK",
+        "func": "finIf",
+        "anchorX": 443.0,
+        "anchorY": 365.0,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 86,
+        "end": 87,
+        "token": "else",
+        "func": "startElse",
+        "anchorX": 384.0,
+        "anchorY": 468.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 87,
+        "end": 88,
+        "token": "BLOCK",
+        "func": "finElse",
+        "anchorX": 479.0,
+        "anchorY": 519.5,
+        "isGraph": true,
+        "isGlobal": false
+      }
+    ],
+    "start": 81
+  },
+  {
+    "name": "E_BOOL_EQ1",
+    "nodes": [
+      {
+        "x": 215.0,
+        "y": 347.0,
+        "id": 89,
+        "isFinal": false
+      },
+      {
+        "x": 500.0,
+        "y": 364.0,
+        "id": 90,
+        "isFinal": true
+      },
+      {
+        "x": 671.0,
+        "y": 346.0,
+        "id": 91,
+        "isFinal": false
+      },
+      {
+        "x": 359.0,
+        "y": 470.0,
+        "id": 92,
+        "isFinal": false
+      }
+    ],
+    "edges": [
+      {
+        "start": 89,
+        "end": 90,
+        "token": "E_BOOL_EQ2",
+        "func": "",
+        "anchorX": 354.5,
+        "anchorY": 351.5,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 90,
+        "end": 91,
+        "token": "\u003d\u003d",
+        "func": "",
+        "anchorX": 583.5,
+        "anchorY": 311.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 90,
+        "end": 92,
+        "token": "!\u003d",
+        "func": "",
+        "anchorX": 426.5,
+        "anchorY": 413.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 91,
+        "end": 90,
+        "token": "E_BOOL_EQ2",
+        "func": "BOOL_EQ",
+        "anchorX": 584.5,
+        "anchorY": 420.0,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 92,
+        "end": 90,
+        "token": "E_BOOL_EQ2",
+        "func": "BOOL_NEQ",
+        "anchorX": 471.5,
+        "anchorY": 457.0,
+        "isGraph": true,
+        "isGlobal": false
+      }
+    ],
+    "start": 89
+  },
+  {
+    "name": "E_BOOL_EQ2",
+    "nodes": [
+      {
+        "x": 245.0,
+        "y": 394.0,
+        "id": 93,
+        "isFinal": false
+      },
+      {
+        "x": 496.0,
+        "y": 430.0,
+        "id": 94,
+        "isFinal": true
+      },
+      {
+        "x": 640.0,
+        "y": 307.0,
+        "id": 95,
+        "isFinal": false
+      },
+      {
+        "x": 542.0,
+        "y": 574.0,
+        "id": 96,
+        "isFinal": false
+      },
+      {
+        "x": 699.0,
+        "y": 466.0,
+        "id": 97,
+        "isFinal": false
+      },
+      {
+        "x": 384.0,
+        "y": 556.0,
+        "id": 98,
+        "isFinal": false
+      }
+    ],
+    "edges": [
+      {
+        "start": 93,
+        "end": 94,
+        "token": "E_BIN_ADDSUB",
+        "func": "",
+        "anchorX": 344.0,
+        "anchorY": 404.0,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 94,
+        "end": 95,
+        "token": "\u003c\u003d",
+        "func": "",
+        "anchorX": 504.5,
+        "anchorY": 326.5,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 94,
+        "end": 96,
+        "token": "\u003e\u003d",
+        "func": "",
+        "anchorX": 555.0,
+        "anchorY": 503.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 94,
+        "end": 97,
+        "token": "\u003c",
+        "func": "",
+        "anchorX": 597.5,
+        "anchorY": 448.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 94,
+        "end": 98,
+        "token": "\u003e",
+        "func": "",
+        "anchorX": 433.5,
+        "anchorY": 522.0,
+        "isGraph": false,
+        "isGlobal": false
+      },
+      {
+        "start": 95,
+        "end": 94,
+        "token": "E_BIN_ADDSUB",
+        "func": "LEQ",
+        "anchorX": 568.0,
+        "anchorY": 368.5,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 96,
+        "end": 94,
+        "token": "E_BIN_ADDSUB",
+        "func": "GEQ",
+        "anchorX": 498.0,
+        "anchorY": 528.0,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 97,
+        "end": 94,
+        "token": "E_BIN_ADDSUB",
+        "func": "LESS",
+        "anchorX": 669.5,
+        "anchorY": 404.0,
+        "isGraph": true,
+        "isGlobal": false
+      },
+      {
+        "start": 98,
+        "end": 94,
+        "token": "E_BIN_ADDSUB",
+        "func": "GREATER",
+        "anchorX": 402.0,
+        "anchorY": 478.0,
+        "isGraph": true,
+        "isGlobal": false
+      }
+    ],
+    "start": 93
   }
 ]

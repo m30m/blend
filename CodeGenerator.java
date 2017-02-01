@@ -125,6 +125,11 @@ class Function {
         return new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -localVarsSize);
     }
 
+    Variable getTempBool() {
+        localVarsSize += 1;
+        return new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.BOOL, -localVarsSize);
+    }
+
     public Variable getVariable(Identifier varId) {
         if (!vars.containsKey(varId))
             return null;
@@ -149,6 +154,7 @@ public class CodeGenerator {
 
     private Variable lastVariable;
     private boolean insideFuncDef;
+    private boolean isRightHandSide;
 
     public CodeGenerator(Scanner scanner) {
         this.scanner = scanner;
@@ -211,6 +217,20 @@ public class CodeGenerator {
                 sstack.push(v);
                 break;
             }
+            case "BOOL_EQ":
+            case "BOOL_NEQ":
+            case "GREATER":
+            case "LESS":
+            case "GEQ":
+            case "LEQ":
+            {
+                Variable tempBool = currentFunction.getTempBool();
+                Variable op2 = (Variable) sstack.pop();
+                Variable op1 = (Variable) sstack.pop();
+                makeIns(opToString(sem), op1, op2, tempBool);
+                sstack.push(tempBool);
+                break;
+            }
             case "BIN_DIV":
             case "BIN_MOD":
             case "BIN_MUL":
@@ -256,14 +276,25 @@ public class CodeGenerator {
                 }
                 break;
             }
+            case "setRHS": {
+                isRightHandSide = true;
+                break;
+            }
             case "assign": {
                 //assign the pushed id to the
                 Variable opr1 = (Variable) sstack.pop();
-                Identifier id = (Identifier) sstack.pop();
-                Variable opr2 = currentFunction.getVariable(id);
-                if (opr2 == null)
-                    throw new RuntimeException("Assignment before decleartion of variable " + id.id);
+                Variable opr2;
+                if(sstack.peek() instanceof Identifier) {
+                    Identifier id = (Identifier) sstack.pop();
+                    opr2 = currentFunction.getVariable(id);
+                    if (opr2 == null)
+                        throw new RuntimeException("Assignment before decleartion of variable " + id.id);
+                }
+                else
+                    opr2= (Variable) sstack.pop();
+
                 makeIns(":=", opr1, opr2);
+                isRightHandSide = false;
                 break;
             }
             case "assignDeclared": {
@@ -296,18 +327,14 @@ public class CodeGenerator {
             }
             case "finFunc": {
                 Function f = new Function();//FIXME: This is bullshit
-
                 sstack.pop(); // pop "start_function"
                 sstack.push(f);
                 insideFuncDef = false;
                 break;
             }
             case "finFuncBody": {
-                pop(currentFunction.localVarsSize);
+                end_current_function();
                 instructions.set(currentFunction.start_PC, getIns("-", SP, makeConst(currentFunction.localVarsSize), SP));
-                makeIns(":=", currentFunction.return_addr, AX);
-                makeIns("sp:=", currentFunction.old_base_pointer);
-                makeIns("jmp", AX);
                 currentFunction = null;
                 break;
             }
@@ -350,7 +377,57 @@ public class CodeGenerator {
                 break;
             }
             case "return": {
+                //FIXME multi return, check return type
+                Identifier id = (Identifier) currentToken;
+                Variable variable = currentFunction.getVariable(id);
+                if (variable == null)
+                    throw new RuntimeException("returning unidentified identifier");
+                makeIns(":=", variable, FUNCTION_RESULT);
+                end_current_function();
+                break;
+            }
 
+            case "finIfCondition": {
+                Variable var = (Variable) sstack.pop();
+                sstack.push(PC);
+                sstack.push(var);
+                sstack.push("start_if");
+                makeIns("jz", var, makeConst(0)); // Jump location is not known yet
+                break;
+            }
+            case "finIf": {
+                if (!sstack.pop().equals("start_if"))
+                    throw new RuntimeException();
+                Variable condition = (Variable) sstack.pop();
+                Integer PC_pos = (Integer) sstack.pop();
+                instructions.set(PC_pos, getIns("jz", condition, makeConst(PC)));
+                sstack.push(PC_pos);
+                sstack.push(condition);
+                sstack.push("end_if");
+                break;
+            }
+            case "startElse": {
+                if (!sstack.pop().equals("end_if"))
+                    throw new RuntimeException();
+                Variable condition = (Variable) sstack.pop();
+                instructions.set((Integer) sstack.pop(), getIns("jz", condition, makeConst(PC + 1)));
+                sstack.push(PC);
+                sstack.push("start_else");
+                makeIns("jmp", makeConst(0));
+                break;
+            }
+            case "finElse": {
+                if (!sstack.pop().equals("start_else"))
+                    throw new RuntimeException();
+                instructions.set((Integer) sstack.pop(), getIns("jmp", makeConst(PC)));
+                sstack.push(0);
+                sstack.push("end_if");
+                break;
+            }
+            case "finCondition": {
+                if (!sstack.pop().equals("end_if"))
+                    throw new RuntimeException();
+                sstack.pop();
                 break;
             }
 
@@ -366,6 +443,13 @@ public class CodeGenerator {
             }
 
         }
+    }
+
+    private void end_current_function() {
+        pop(currentFunction.localVarsSize);
+        makeIns(":=", currentFunction.return_addr, AX);
+        makeIns("sp:=", currentFunction.old_base_pointer);
+        makeIns("jmp", AX);
     }
 
     private Variable makeConst(Literal currentToken) {
@@ -414,10 +498,17 @@ public class CodeGenerator {
             push(arguments.get(i));
         }
         makeIns(":=sp", AX);
-        push(makeConst(PC + 2 + 2 + 2));
+        push(makeConst(0));
+        int jump_instruction = PC - 1;
         push(AX);
         makeIns("sp:=", SP);
         makeIns("jmp", makeConst(f.start_PC));
+        instructions.set(jump_instruction, getIns(":=", makeConst(PC), SP_place));
+        if (currentFunction != null && isRightHandSide) {
+            Variable result = currentFunction.getTempInt();
+            makeIns(":=", FUNCTION_RESULT, result);
+            sstack.push(result);
+        }
     }
 
     private String opToString(String op) {
@@ -446,11 +537,13 @@ public class CodeGenerator {
                 return "<";
             case "LEQ":
                 return "<=";
-            case "EQUAL":
+            case "BOOL_EQ":
                 return "==";
-            case "MORE":
+            case "BOOL_NEQ":
+                return "==";
+            case "GREATER":
                 return ">";
-            case "MEQ":
+            case "GEQ":
                 return ">=";
             case "NEQ":
                 return "!";
@@ -486,5 +579,10 @@ public class CodeGenerator {
         } catch (IOException e) {
             // do something
         }
+    }
+
+    public boolean isStruct(String yytext) {
+//        throw new RuntimeException("Not IMplemented");
+        return false;//FIXME
     }
 }

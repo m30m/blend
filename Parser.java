@@ -5,7 +5,7 @@ import java.util.Stack;
 
 public class Parser {
     Scanner scanner;
-    CodeGenerator cg;
+    static CodeGenerator cg;
     PTBlock[][] parseTable;
     Stack<Integer> parseStack = new Stack<Integer>();
     String[] symbols;
@@ -82,6 +82,7 @@ public class Parser {
             cg.FinishCode();
         } catch (Exception e) {
             e.printStackTrace();
+            return;
         }
     }
 

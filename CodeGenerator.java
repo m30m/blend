@@ -4,6 +4,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Stack;
 
+class Loop {
+    int startAddr;//Address of the first instruction in while block
+    int whileAddr;//Address for start of evaluation the while condition
+    int endAddr;//Address of the first instruction after the while
+    ArrayList<Integer> breakAddrs;
+    ArrayList<Integer> continueAddrs;
+    Variable conditionVar;
+    int jzAddr;
+    int jmpAddr;
+
+    public Loop() {
+        breakAddrs = new ArrayList<>();
+        continueAddrs = new ArrayList<>();
+    }
+}
+
 class Variable {
     enum ADDR_MODE {GLOBAL_DIRECT, GLOBAL_INDIRECT, LOCAL_DIRECT, LOCAL_INDIRECT, IMMEDIATE}
 
@@ -91,10 +107,13 @@ class Function {
     Variable return_addr;
     Variable old_base_pointer;
 
+    Stack<Loop> loopStack;
+
     public Function() {
         return_types = new ArrayList<>();
         vars = new HashMap<>();
         argsOrder = new ArrayList<>();
+        loopStack = new Stack<>();
         old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 0);
         return_addr = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 4);
         argVarsSize = 8;//return address and old base pointer
@@ -325,6 +344,84 @@ public class CodeGenerator {
                 makeIns("-", SP, makeConst(0), SP);
                 break;
             }
+            case "startDoLoop": {
+                Loop l = new Loop();
+                l.startAddr = PC;
+                currentFunction.loopStack.push(l);
+                //fill the loop stack with block start
+                //push to loop stack
+                System.out.println("sem = " + sem);
+                break;
+            }
+            case "startWhileBlock": {
+                //done
+                Loop l = currentFunction.loopStack.peek();
+                l.startAddr = PC;
+                break;
+            }
+            case "finWhileLoop": {
+                Loop l = currentFunction.loopStack.peek();
+                makeIns("jmp", makeConst(l.whileAddr));
+                break;
+            }
+            case "startWhileLoop": {
+                //done
+                currentFunction.loopStack.push(new Loop());
+                //push to loop stack
+                System.out.println("sem = " + sem);
+                break;
+            }
+            case "finWhileCondition": {
+                System.out.println("sem = " + sem);
+                Loop l = currentFunction.loopStack.peek();
+                Variable var = (Variable) sstack.pop();
+                l.conditionVar = var;
+                l.jzAddr = PC; // Jump location is not known yet
+                instructions.add("");
+                PC++;
+                l.jmpAddr = PC; // Jump location is not known yet
+                instructions.add("");
+                PC++;
+                break;
+            }
+            case "startWhileCondition": {
+                //done
+                Loop l = currentFunction.loopStack.peek();
+                l.whileAddr = PC;
+                //fill the loop stack check address
+                System.out.println("sem = " + sem);
+                break;
+            }
+            case "finLoop": {
+                Loop l = currentFunction.loopStack.pop();
+                l.endAddr = PC;
+                for (Integer breakAddr : l.breakAddrs)
+                    instructions.set(breakAddr, getIns("jmp", makeConst(l.endAddr)));
+                for (Integer continueAddr : l.continueAddrs)
+                    instructions.set(continueAddr, getIns("jmp", makeConst(l.whileAddr)));
+                instructions.set(l.jzAddr, getIns("jz", l.conditionVar, makeConst(l.endAddr)));
+                instructions.set(l.jmpAddr, getIns("jmp", makeConst(l.startAddr)));
+                //fill the loop stack with the next address
+                System.out.println("sem = " + sem);
+                //pop from the sstack and fill anything necessary
+                //pop from loop stack
+                break;
+            }
+            case "break": {
+                Loop l = currentFunction.loopStack.peek();
+                l.breakAddrs.add(PC);
+                instructions.add("");
+                PC++;
+                break;
+            }
+            case "continue": {
+                Loop l = currentFunction.loopStack.peek();
+                l.continueAddrs.add(PC);
+                instructions.add("");
+                PC++;
+                break;
+            }
+
             case "finFunc": {
                 Function f = new Function();//FIXME: This is bullshit
                 sstack.pop(); // pop "start_function"

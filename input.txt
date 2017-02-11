@@ -1,13 +1,16 @@
-function (int) fibo(int x)
-{
-    int a:=5;
-    return a;
-}
-
-
 function (int) main()
 {
-    int a:=fibo(34);
-    a :=  a + a;
-    write(a);
+    int a:=3;
+    int b:=8;
+    write(b);
+    while(a<b)
+    {
+        a := a+2;
+        if(a=7)
+        {
+            write(b);
+            continue;
+        };
+        write(a);
+    };
 }

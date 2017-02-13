@@ -527,6 +527,41 @@ public class CodeGenerator {
                 sstack.pop();
                 break;
             }
+            case "returnStart":
+            {
+                break;
+            }
+            case "returnId":
+            {
+                // check case "return"
+                break;
+            }
+            case "returnFin":
+
+            case "initTuple":
+            case "addTuple":
+            case "finTuple":
+
+            case "assignStructEnd":// implement the scanner too
+            case "assignStructStart":
+            case "assignStructEndEmpty":
+            case "assignStructEmpty":
+            case "structEnd":
+            case "structVar":
+            case "structId":
+
+            case "envEnd":
+            case "envVar":
+            case "envId":
+
+            case "labelId":
+            case "gotoId":
+
+
+
+
+
+
 
             case "UNARY_NOT":
             case "COMPLEMENT":

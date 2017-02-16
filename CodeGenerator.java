@@ -2,8 +2,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.atomic.DoubleAccumulator;
 
 
 public class CodeGenerator {
@@ -122,8 +122,8 @@ public class CodeGenerator {
                 break;
             }
             case "pushId": {
-                if (currentFunction != null && currentFunction.vars.containsKey(currentToken))
-                    sstack.push(currentFunction.vars.get(currentToken));
+                if (currentFunction != null && currentFunction.containsKey((Identifier) currentToken))
+                    sstack.push(currentFunction.getVariable((Identifier) currentToken));
                 else
                     sstack.push(currentToken);
                 break;
@@ -375,12 +375,10 @@ public class CodeGenerator {
                 sstack.pop();
                 break;
             }
-            case "returnStart":
-            {
+            case "returnStart": {
                 break;
             }
-            case "returnId":
-            {
+            case "returnId": {
                 // check case "return"
                 break;
             }
@@ -402,21 +400,29 @@ public class CodeGenerator {
             case "envVar":
             case "envId":
 
-            case "labelId":
-            {
-
+            case "labelId": {
+                currentFunction.addLabel((Identifier) currentToken, PC);
                 break;
             }
-            case "gotoId":
-            {
-                System.out.println("sem = " + sem);
+            case "gotoId": {
+                currentFunction.getLastScope().labelJumps.put(PC, (Identifier) currentToken);
+                instructions.add("");
+                PC++;
                 break;
             }
 
-
-
-
-
+            case "blockFin"://FIXME add in piegon
+            {
+                for (Map.Entry<Integer, Identifier> entry : currentFunction.getLastScope().labelJumps.entrySet()) {
+                    int pc = currentFunction.getLabel(entry.getValue());
+                    if (pc == -1)
+                        throw new RuntimeException("Label " + currentToken.parser_token + " doesn't exist for goto");
+                    instructions.set(entry.getKey(), getIns("jmp", makeConst(pc)));
+                }
+                //iterate jumps and make instructions
+                currentFunction.popLastScope();
+                break;
+            }
 
 
             case "UNARY_NOT":

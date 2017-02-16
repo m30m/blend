@@ -5,11 +5,24 @@ import java.util.Stack;
 /**
  * Created by amin on 2/16/17.
  */
+
+class Scope {
+    HashMap<Identifier, Variable> vars;
+    HashMap<Identifier, Integer> labels;
+    HashMap<Integer, Identifier> labelJumps;
+
+    public Scope() {
+        vars = new HashMap<>();
+        labels = new HashMap<>();
+        labelJumps = new HashMap<>();
+    }
+}
+
 class Function {
     int argVarsSize;
     ArrayList<Type> return_types;
     ArrayList<Variable> argsOrder;//FIXME
-    HashMap<Identifier, Variable> vars;
+    ArrayList<Scope> scopes;
     int localVarsSize = 0;
     Identifier id;
     int start_PC;
@@ -20,7 +33,8 @@ class Function {
 
     public Function() {
         return_types = new ArrayList<>();
-        vars = new HashMap<>();
+        scopes = new ArrayList<>();
+        scopes.add(new Scope());
         argsOrder = new ArrayList<>();
         loopStack = new Stack<>();
         old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 0);
@@ -30,22 +44,43 @@ class Function {
     }
 
     public void addArgument(Type t, Identifier argId) {
-        if (vars.containsKey(argId))
+        if (scopes.get(0).vars.containsKey(argId))
             throw new RuntimeException("Arguments with the same name!");
         Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), argVarsSize);
         argVarsSize += t.getByteSize();
-        vars.put(argId, arg);
+        scopes.get(0).vars.put(argId, arg);
         argsOrder.add(arg);
-
     }
 
     public Variable addVariable(Type t, Identifier varId) {
-        if (vars.containsKey(varId))
+        if (containsKey(varId))
             throw new RuntimeException("Duplicate declaration of " + varId.id + " in function " + id.id);
         localVarsSize += t.getByteSize();
         Variable v = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
-        vars.put(varId, v);
+        getLastScope().vars.put(varId, v);
         return v;
+    }
+
+    public void addLabel(Identifier varId, int PC) {
+        if (containsLabel(varId))
+            throw new RuntimeException("Duplicate declaration of label " + varId.id + " in function " + id.id);
+        scopes.get(scopes.size() - 1).labels.put(varId, PC);
+    }
+
+    boolean containsKey(Identifier varId) {
+        for (Scope scope : scopes) {
+            if (scope.vars.containsKey(varId))
+                return true;
+        }
+        return false;
+    }
+
+    boolean containsLabel(Identifier varId) {
+        for (Scope scope : scopes) {
+            if (scope.labels.containsKey(varId))
+                return true;
+        }
+        return false;
     }
 
     Variable getTempInt() {
@@ -64,8 +99,23 @@ class Function {
     }
 
     public Variable getVariable(Identifier varId) {
-        if (!vars.containsKey(varId))
-            return null;
-        return vars.get(varId);
+        for (int i = scopes.size() - 1; i >= 0; i--)
+            if (scopes.get(i).vars.containsKey(varId))
+                return scopes.get(i).vars.get(varId);
+        return null;
+    }
+
+    Scope getLastScope() {
+        return scopes.get(scopes.size() - 1);
+    }
+
+    public int getLabel(Identifier varId) {
+        if (getLastScope().labels.containsKey(varId))
+            return getLastScope().labels.get(varId);
+        return -1;
+    }
+
+    public void popLastScope() {
+        scopes.remove(scopes.size()-1);
     }
 }

@@ -3,158 +3,8 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Stack;
+import java.util.concurrent.atomic.DoubleAccumulator;
 
-class Loop {
-    int startAddr;//Address of the first instruction in while block
-    int whileAddr;//Address for start of evaluation the while condition
-    int endAddr;//Address of the first instruction after the while
-    ArrayList<Integer> breakAddrs;
-    ArrayList<Integer> continueAddrs;
-    Variable conditionVar;
-    int jzAddr;
-    int jmpAddr;
-
-    public Loop() {
-        breakAddrs = new ArrayList<>();
-        continueAddrs = new ArrayList<>();
-    }
-}
-
-class Variable {
-    enum ADDR_MODE {GLOBAL_DIRECT, GLOBAL_INDIRECT, LOCAL_DIRECT, LOCAL_INDIRECT, IMMEDIATE}
-
-    enum TYPE {INT, REAL, BOOL, STRING, CHAR}
-
-
-    ADDR_MODE mode;
-    TYPE type;
-    int value;
-
-    public Variable(ADDR_MODE mode, TYPE type, int value) {
-        this.mode = mode;
-        this.type = type;
-        this.value = value;
-    }
-
-    public int getByteSize() {
-        switch (type) {
-            case STRING:
-                return 4;
-            case INT:
-                return 4;
-            case REAL:
-                return 4;
-            case CHAR:
-                return 1;
-            case BOOL:
-                return 1;
-//            case "long": // FIXME
-//                return 8;
-        }
-        throw new RuntimeException("Unknown type");
-    }
-
-    @Override
-    public String toString() {
-        String modeStr = modeToStr(mode);
-        String typeStr = typeToStr(type);
-        return modeStr + typeStr + value;
-    }
-
-    private String typeToStr(TYPE type) {
-        switch (type) {
-
-            case INT:
-                return "i_";
-            case REAL:
-                return "f_";
-            case BOOL:
-                return "b_";
-            case STRING:
-                return "s_";
-            case CHAR:
-                return "c_";
-        }
-        return "ERR";
-    }
-
-    private String modeToStr(ADDR_MODE mode) {
-        switch (mode) {
-            case GLOBAL_DIRECT:
-                return "gd_";
-            case GLOBAL_INDIRECT:
-                return "gi_";
-            case LOCAL_DIRECT:
-                return "ld_";
-            case LOCAL_INDIRECT:
-                return "li_";
-            case IMMEDIATE:
-                return "im_";
-        }
-        return "ERR";
-    }
-}
-
-
-class Function {
-    int argVarsSize;
-    ArrayList<Type> return_types;
-    ArrayList<Variable> argsOrder;//FIXME
-    HashMap<Identifier, Variable> vars;
-    int localVarsSize = 0;
-    Identifier id;
-    int start_PC;
-    Variable return_addr;
-    Variable old_base_pointer;
-
-    Stack<Loop> loopStack;
-
-    public Function() {
-        return_types = new ArrayList<>();
-        vars = new HashMap<>();
-        argsOrder = new ArrayList<>();
-        loopStack = new Stack<>();
-        old_base_pointer = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 0);
-        return_addr = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, 4);
-        argVarsSize = 8;//return address and old base pointer
-        localVarsSize = 0;
-    }
-
-    public void addArgument(Type t, Identifier argId) {
-        if (vars.containsKey(argId))
-            throw new RuntimeException("Arguments with the same name!");
-        Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), argVarsSize);
-        argVarsSize += t.getByteSize();
-        vars.put(argId, arg);
-        argsOrder.add(arg);
-
-    }
-
-    public Variable addVariable(Type t, Identifier varId) {
-        if (vars.containsKey(varId))
-            throw new RuntimeException("Duplicate declaration of " + varId.id + " in function " + id.id);
-        localVarsSize += t.getByteSize();
-        Variable v = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), -localVarsSize);
-        vars.put(varId, v);
-        return v;
-    }
-
-    Variable getTempInt() {
-        localVarsSize += 4;
-        return new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.INT, -localVarsSize);
-    }
-
-    Variable getTempBool() {
-        localVarsSize += 1;
-        return new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.BOOL, -localVarsSize);
-    }
-
-    public Variable getVariable(Identifier varId) {
-        if (!vars.containsKey(varId))
-            return null;
-        return vars.get(varId);
-    }
-}
 
 public class CodeGenerator {
     Function currentFunction;
@@ -241,8 +91,7 @@ public class CodeGenerator {
             case "GREATER":
             case "LESS":
             case "GEQ":
-            case "LEQ":
-            {
+            case "LEQ": {
                 Variable tempBool = currentFunction.getTempBool();
                 Variable op2 = (Variable) sstack.pop();
                 Variable op1 = (Variable) sstack.pop();
@@ -260,10 +109,10 @@ public class CodeGenerator {
             case "BIN_AND":
             case "BIN_OR":
             case "BIN_ADD": {
-                //TODO:Check type
-                Variable tempInt = currentFunction.getTempInt();
+                //TODO:Implement casting
                 Variable op2 = (Variable) sstack.pop();
                 Variable op1 = (Variable) sstack.pop();
+                Variable tempInt = currentFunction.getTemp(op1.type, 1);
                 makeIns(opToString(sem), op1, op2, tempInt);
                 sstack.push(tempInt);
                 break;
@@ -303,14 +152,13 @@ public class CodeGenerator {
                 //assign the pushed id to the
                 Variable opr1 = (Variable) sstack.pop();
                 Variable opr2;
-                if(sstack.peek() instanceof Identifier) {
+                if (sstack.peek() instanceof Identifier) {
                     Identifier id = (Identifier) sstack.pop();
                     opr2 = currentFunction.getVariable(id);
                     if (opr2 == null)
                         throw new RuntimeException("Assignment before decleartion of variable " + id.id);
-                }
-                else
-                    opr2= (Variable) sstack.pop();
+                } else
+                    opr2 = (Variable) sstack.pop();
 
                 makeIns(":=", opr1, opr2);
                 isRightHandSide = false;
@@ -555,7 +403,15 @@ public class CodeGenerator {
             case "envId":
 
             case "labelId":
+            {
+
+                break;
+            }
             case "gotoId":
+            {
+                System.out.println("sem = " + sem);
+                break;
+            }
 
 
 
@@ -587,23 +443,25 @@ public class CodeGenerator {
     private Variable makeConst(Literal currentToken) {
         switch (currentToken.type) {
             case "CHAR": {
-                throw new RuntimeException("Not Implemeneted");
-                //return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.CHAR,'c');//FIXME
+                //Trim the single quotes
+                String charValue = currentToken.value.substring(1, currentToken.value.length() - 1);
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.CHAR, charValue);
             }
             case "REAL": {
-                throw new RuntimeException("Not Implemeneted");
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.REAL, String.valueOf(Double.parseDouble(currentToken.value)));
             }
             case "HEX": {
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(currentToken.value, 16));
+                //Trim the leading 0x
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(currentToken.value.substring(2), 16));
             }
             case "INT": {
                 return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(currentToken.value));
             }
             case "BOOL": {
                 if (currentToken.value.equals("false"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, 0);
+                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, "false");
                 else if (currentToken.value.equals("true"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, 1);
+                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, "true");
                 else
                     throw new RuntimeException("Boolean with value other than true or false");
             }

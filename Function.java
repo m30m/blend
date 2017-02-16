@@ -20,7 +20,7 @@ class Scope {
 
 class Function {
     int argVarsSize;
-    ArrayList<Type> return_types;
+    ArrayList<PrimitiveType> return_types;
     ArrayList<Variable> argsOrder;//FIXME
     ArrayList<Scope> scopes;
     int localVarsSize = 0;
@@ -43,7 +43,7 @@ class Function {
         localVarsSize = 0;
     }
 
-    public void addArgument(Type t, Identifier argId) {
+    public void addArgument(PrimitiveType t, Identifier argId) {
         if (scopes.get(0).vars.containsKey(argId))
             throw new RuntimeException("Arguments with the same name!");
         Variable arg = new Variable(Variable.ADDR_MODE.LOCAL_DIRECT, Variable.TYPE.valueOf(t.type.toUpperCase()), argVarsSize);
@@ -52,7 +52,7 @@ class Function {
         argsOrder.add(arg);
     }
 
-    public Variable addVariable(Type t, Identifier varId) {
+    public Variable addVariable(PrimitiveType t, Identifier varId) {
         if (containsKey(varId))
             throw new RuntimeException("Duplicate declaration of " + varId.id + " in function " + id.id);
         localVarsSize += t.getByteSize();

@@ -54,10 +54,10 @@ CharLiteral = '[^']' | '\''
 /* keywords */
 <YYINITIAL> "array"                     { return new Token(yytext()); }
 <YYINITIAL> "assign"                    { return new Token(yytext()); }
-<YYINITIAL> "bool"                      { return new Type("type", yytext()); }
+<YYINITIAL> "bool"                      { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "break"                     { return new Token(yytext()); }
 <YYINITIAL> "case"                      { return new Token(yytext()); }
-<YYINITIAL> "char"                      { return new Type("type", yytext()); }
+<YYINITIAL> "char"                      { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "continue"                  { return new Token(yytext()); }
 <YYINITIAL> "do"                        { return new Token(yytext()); }
 <YYINITIAL> "else"                      { return new Token(yytext()); }
@@ -67,17 +67,17 @@ CharLiteral = '[^']' | '\''
 <YYINITIAL> "function"                  { return new Token(yytext()); }
 <YYINITIAL> "goto"                      { return new Token(yytext()); }
 <YYINITIAL> "if"                        { return new Token(yytext()); }
-<YYINITIAL> "int"                       { return new Type("type", yytext()); }
+<YYINITIAL> "int"                       { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "isvoid"                    { return new Token(yytext()); }
 <YYINITIAL> "label"                     { return new Token(yytext()); }
 <YYINITIAL> "late"                      { return new Token(yytext()); }
-<YYINITIAL> "long"                      { return new Type("type", yytext()); }
+<YYINITIAL> "long"                      { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "of"                        { return new Token(yytext()); }
 <YYINITIAL> "out"                       { return new Token(yytext()); }
-<YYINITIAL> "real"                      { return new Type("type", yytext()); }
+<YYINITIAL> "real"                      { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "release"                   { return new Token(yytext()); }
 <YYINITIAL> "return"                    { return new Token(yytext()); }
-<YYINITIAL> "string"                    { return new Type("type", yytext()); }
+<YYINITIAL> "string"                    { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "structure"                 { return new Token(yytext()); }
 <YYINITIAL> "true"                      { return new Literal("const", "BOOL", yytext()); }
 <YYINITIAL> "void"                      { return new Token(yytext()); }
@@ -85,7 +85,7 @@ CharLiteral = '[^']' | '\''
 
 <YYINITIAL> {
   /* identifiers */
-  {Identifier}                   {if(Parser.cg.isStruct(yytext())){return new Type("type",yytext());}return new Identifier("id", yytext());; }
+  {Identifier}                   {if(Parser.cg.getStruct(yytext())!=null){return new PrimitiveType("type", "int");}return new Identifier("id", yytext()); }
 
   /* literals */
   {HexIntegerLiteral}            { return new Literal("const", "HEX", yytext()); }

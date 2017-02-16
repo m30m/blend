@@ -1,15 +1,57 @@
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
+
+class StructType extends Token implements Type {
+    private final String type;
+    int size = 0;
+    ArrayList<Map.Entry<Identifier, Type>> fields = new ArrayList<>();
+
+    public StructType(String parser_token, String type) {
+        super(parser_token);
+        this.type = type;
+    }
+
+
+    boolean hasField(Identifier fieldId) {
+        for (Map.Entry<Identifier, Type> field : fields) {
+            if (field.getKey().equals(fieldId))
+                return true;
+        }
+        return false;
+    }
+
+    public void addField(Type t, Identifier fieldId) {
+        if (hasField(fieldId))
+            throw new RuntimeException("Duplicate declaration of field " + fieldId.id + " in struct");
+        size += t.getByteSize();
+        fields.add(new AbstractMap.SimpleEntry<Identifier, Type>(fieldId, t));
+    }
+
+    public int getFieldOffset(Identifier fieldId) {
+        int offset = 0;
+        for (Map.Entry<Identifier, Type> field : fields) {
+            if (field.getKey().equals(fieldId))
+                return offset;
+            offset += field.getValue().getByteSize();
+        }
+        throw new RuntimeException("Field " + fieldId.parser_token + " doesn't exist in struct");
+    }
+
+
+    @Override
+    public int getByteSize() {
+        return size;
+    }
+}
 
 
 public class CodeGenerator {
     Function currentFunction;
+    StructType currentStruct = null;
     Scanner scanner; // This was my way of informing CG about Constant Values detected by Scanner, you can do whatever you like
     HashMap<Identifier, Function> functionsHashMap;
+    HashMap<String, StructType> structsHashMap;
     ArrayList<String> instructions;
     int PC;
     Variable SP;
@@ -23,6 +65,7 @@ public class CodeGenerator {
 
     private Variable lastVariable;
     private boolean insideFuncDef;
+    private boolean insideStructDef;
     private boolean isRightHandSide;
 
     public CodeGenerator(Scanner scanner) {
@@ -30,6 +73,7 @@ public class CodeGenerator {
         this.sstack = new Stack<>();
         this.instructions = new ArrayList<>();
         this.functionsHashMap = new HashMap<>();
+        this.structsHashMap = new HashMap<>();
         this.PC = 0;
         this.SP = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 0);
         makeIns(":=", makeConst(1000 * 1000), SP);
@@ -134,9 +178,11 @@ public class CodeGenerator {
                 break;
             }
             case "varDeclare": {
-                Type t = (Type) sstack.pop();
+                PrimitiveType t = (PrimitiveType) sstack.pop();
                 Identifier id = (Identifier) currentToken;
-                if (insideFuncDef) {
+                if (insideStructDef) {
+                    currentStruct.addField(t, id);
+                } else if (insideFuncDef) {
                     currentFunction.addArgument(t, id);
                 } else {
                     Variable variable = currentFunction.addVariable(t, id);
@@ -165,7 +211,7 @@ public class CodeGenerator {
                 break;
             }
             case "assignDeclared": {
-                if (insideFuncDef)
+                if (insideFuncDef || insideStructDef)
                     throw new RuntimeException("Can't assign variable inside declaration");
                 makeIns(":=", (Variable) sstack.pop(), lastVariable);
                 break;
@@ -184,7 +230,7 @@ public class CodeGenerator {
                     throw new RuntimeException("Duplicate function decleration with name: " + f.id);
                 while (!sstack.peek().equals("start_function"))//reading return types
                 {
-                    f.return_types.add(0, (Type) sstack.pop());
+                    f.return_types.add(0, (PrimitiveType) sstack.pop());
                 }
                 functionsHashMap.put(f.id, f);
                 currentFunction = f;
@@ -392,9 +438,21 @@ public class CodeGenerator {
             case "assignStructStart":
             case "assignStructEndEmpty":
             case "assignStructEmpty":
-            case "structEnd":
-            case "structVar":
-            case "structId":
+            case "structEnd": {
+                insideStructDef = false;
+                currentStruct = null;
+                break;
+            }
+            case "structVar": {
+                break;
+            }
+            case "structId": {
+                insideStructDef = true;
+                String struct_name = ((Identifier) currentToken).id;
+                currentStruct = new StructType("type", struct_name);
+                structsHashMap.put(struct_name, currentStruct);
+                break;
+            }
 
             case "envEnd":
             case "envVar":
@@ -577,8 +635,7 @@ public class CodeGenerator {
         }
     }
 
-    public boolean isStruct(String yytext) {
-//        throw new RuntimeException("Not IMplemented");
-        return false;//FIXME
+    public StructType getStruct(String yytext) {
+        return (structsHashMap.getOrDefault(yytext, null));
     }
 }

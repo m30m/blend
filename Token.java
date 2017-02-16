@@ -47,10 +47,15 @@ class Literal extends Token {
     }
 }
 
-class Type extends Token {
+interface Type
+{
+    int getByteSize();
+}
+
+class PrimitiveType extends Token implements Type{
     String type;
 
-    public Type(String parser_token, String type) {
+    public PrimitiveType(String parser_token, String type) {
         super(parser_token);
         this.type = type;
     }
@@ -70,6 +75,6 @@ class Type extends Token {
             case "long":
                 return 8;
         }
-        throw new RuntimeException("Unknown type");
+        throw new RuntimeException("Unknown primitive type");
     }
 }

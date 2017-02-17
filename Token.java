@@ -47,17 +47,40 @@ class Literal extends Token {
     }
 }
 
-interface Type
-{
-    int getByteSize();
-}
-
-class PrimitiveType extends Token implements Type{
+abstract class Type extends Token {
     String type;
 
-    public PrimitiveType(String parser_token, String type) {
+    public Type(String parser_token, String type) {
         super(parser_token);
         this.type = type;
+    }
+
+    abstract int getByteSize();
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Type type1 = (Type) o;
+
+        return type != null ? type.equals(type1.type) : type1.type == null;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return type != null ? type.hashCode() : 0;
+    }
+
+    abstract String typeToVMStr();
+}
+
+class PrimitiveType extends Type {
+
+
+    public PrimitiveType(String parser_token, String type) {
+        super(parser_token, type);
     }
 
     public int getByteSize() {
@@ -76,5 +99,21 @@ class PrimitiveType extends Token implements Type{
                 return 8;
         }
         throw new RuntimeException("Unknown primitive type");
+    }
+
+    String typeToVMStr() {
+        switch (this.type) {
+            case "int":
+                return "i_";
+            case "real":
+                return "f_";
+            case "bool":
+                return "b_";
+            case "string":
+                return "s_";
+            case "char":
+                return "c_";
+        }
+        return "ERR";
     }
 }

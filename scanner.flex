@@ -85,7 +85,7 @@ CharLiteral = '[^']' | '\''
 
 <YYINITIAL> {
   /* identifiers */
-  {Identifier}                   {if(Parser.cg.getStruct(yytext())!=null){return new PrimitiveType("type", "int");}return new Identifier("id", yytext()); }
+  {Identifier}                   {if(Parser.cg.getStruct(yytext())!=null){return Parser.cg.getStruct(yytext());}return new Identifier("id", yytext()); }
 
   /* literals */
   {HexIntegerLiteral}            { return new Literal("const", "HEX", yytext()); }
@@ -95,6 +95,8 @@ CharLiteral = '[^']' | '\''
   \"                             { string.setLength(0); yybegin(STRING); }
 
   /* syntax */
+  "."                            { return new Token(yytext()); }
+  ":"                            { return new Token(yytext()); }
   ","                            { return new Token(yytext()); }
   "["                            { return new Token(yytext()); }
   "]"                            { return new Token(yytext()); }
@@ -126,7 +128,7 @@ CharLiteral = '[^']' | '\''
   ">="                           { return new Token(yytext()); }
   "!="                           { return new Token(yytext()); }
   "<"                            { return new Token(yytext()); }
-  ">"                            { return new Token(yytext()); }
+  ">"                            {if(Parser.cg.isInsideStructAssign()){return new Token("assignEnd");}return new Token(yytext());}
 
 
 

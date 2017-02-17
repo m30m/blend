@@ -1,11 +1,51 @@
+structure base_str
+{
+    int zz;
+}
+
+structure str1
+{
+    int a;
+    real b;
+    base_str bzs;
+}
+
+function (int,int,real) test_function(int a)
+{
+    a := a+200;
+    int b:=a*2;
+    real c:=34.235;
+    return (a,b,c);
+}
+
+
 function (int) main()
 {
-    int a:=3;
+    environment userEnv
+        {
 
-    int b:=8;
-    goto gav;
+            int aasdf;
+            int boz;
+        };
 
-    label gav;
-    write(532);
+    ::userEnv.boz := 15;
+    ::userEnv.aasdf := 13;
+    case ::userEnv.aasdf of
+        12:{
+            write(12);
+        }
+        13:{
+            write(13);
+            case ::userEnv.boz of
+            10:{}
+            15:{write(69);}
+            20:{}
+            endcase;
+        }
+        18:
+        {
+            write(18);
+        }
+    endcase;
 
 }

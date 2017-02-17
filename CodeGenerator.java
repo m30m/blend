@@ -2,16 +2,27 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
 
-class StructType extends Token implements Type {
-    private final String type;
+class Case {
+    int min_val, max_val;
+    int break_jmp_addr;
+    int end_addr;
+    Variable expr;
+    HashMap<Integer, Integer> const_to_addr = new HashMap<>();
+
+    public Case(int break_jmp_addr, Variable expr) {
+        this.break_jmp_addr = break_jmp_addr;
+        this.expr = expr;
+    }
+
+}
+
+class StructType extends Type {
     int size = 0;
     ArrayList<Map.Entry<Identifier, Type>> fields = new ArrayList<>();
 
     public StructType(String parser_token, String type) {
-        super(parser_token);
-        this.type = type;
+        super(parser_token, type);
     }
-
 
     boolean hasField(Identifier fieldId) {
         for (Map.Entry<Identifier, Type> field : fields) {
@@ -38,9 +49,27 @@ class StructType extends Token implements Type {
         throw new RuntimeException("Field " + fieldId.parser_token + " doesn't exist in struct");
     }
 
+    public Type getFieldType(Identifier fieldId) {
+        for (Map.Entry<Identifier, Type> field : fields) {
+            if (field.getKey().equals(fieldId))
+                return field.getValue();
+        }
+        throw new RuntimeException("Field " + fieldId.parser_token + " doesn't exist in struct");
+    }
+
 
     @Override
     public int getByteSize() {
+        return 4;
+    }
+
+    @Override
+    String typeToVMStr() {
+        return "i_";//just a pointer
+    }
+
+
+    public int getStructSize() {
         return size;
     }
 }
@@ -57,16 +86,19 @@ public class CodeGenerator {
     Variable SP;
     Variable SP_place;
     Variable AX;
+    Variable TMP_BOOL; // used for switch case
     Variable FUNCTION_RESULT;
+    static Type intType = new PrimitiveType("type", "int");
 
     Stack<Object> sstack;
 
     // Define any variables needed for code generation
 
-    private Variable lastVariable;
     private boolean insideFuncDef;
-    private boolean insideStructDef;
-    private boolean isRightHandSide;
+    private boolean insideStructDef = false;
+    private boolean insideEnvDef = false;
+    private boolean insideStructAssign = false;
+    private int tupleSize = 0;
 
     public CodeGenerator(Scanner scanner) {
         this.scanner = scanner;
@@ -75,17 +107,18 @@ public class CodeGenerator {
         this.functionsHashMap = new HashMap<>();
         this.structsHashMap = new HashMap<>();
         this.PC = 0;
-        this.SP = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 0);
+        this.SP = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 0);
         makeIns(":=", makeConst(1000 * 1000), SP);
-        this.SP_place = new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, Variable.TYPE.INT, 0);
-        this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 4);
-        this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, Variable.TYPE.INT, 8);
+        this.SP_place = new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, intType, 0);
+        this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 4);
+        this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 8);
+        this.TMP_BOOL = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "bool"), 12);
         this.currentFunction = null;
         makeIns("jmp", makeConst(0));//the value of jmp is not important since it will be overwritten in the end
     }
 
     private Variable makeConst(int i) {
-        return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, i);
+        return new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, i);
     }
 
     public void makeIns(String opCode, Variable opr1, Variable opr2, Variable opr3) {
@@ -118,6 +151,10 @@ public class CodeGenerator {
         return opCode + " " + opr1 + "\n";
     }
 
+    public boolean isInsideStructAssign() {
+        return insideStructAssign;
+    }
+
     public void Generate(String sem, Token currentToken) {
         System.out.println(sem); // Just for debug
 
@@ -126,7 +163,7 @@ public class CodeGenerator {
                 return;
             case "push": {
                 assert currentToken instanceof Literal;
-                Variable v = new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(((Literal) currentToken).value));
+                Variable v = new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, Integer.parseInt(((Literal) currentToken).value));
                 sstack.push(v);
                 break;
             }
@@ -156,7 +193,7 @@ public class CodeGenerator {
                 //TODO:Implement casting
                 Variable op2 = (Variable) sstack.pop();
                 Variable op1 = (Variable) sstack.pop();
-                Variable tempInt = currentFunction.getTemp(op1.type, 1);
+                Variable tempInt = currentFunction.getTemp(op1.type);
                 makeIns(opToString(sem), op1, op2, tempInt);
                 sstack.push(tempInt);
                 break;
@@ -172,13 +209,28 @@ public class CodeGenerator {
                     sstack.push(currentToken);
                 break;
             }
-            case "pushconst"://FIXME make it camel case
+            case "namespace": {
+                sstack.push((Identifier) currentToken);
+                break;
+            }
+            case "pushid"://Change name to pushIdWithNamespace
             {
+                Identifier envId = (Identifier) sstack.pop();
+                if (currentFunction != null) {
+                    if (currentFunction.containsKey((Identifier) currentToken, envId))
+                        sstack.push(currentFunction.getVariable((Identifier) currentToken, envId));
+                    else
+                        throw new RuntimeException("id in environment doesn't exist");
+                } else
+                    throw new RuntimeException("Not Implemented");//FIXME
+                break;
+            }
+            case "pushconst": {
                 sstack.push(makeConst((Literal) currentToken));
                 break;
             }
             case "varDeclare": {
-                PrimitiveType t = (PrimitiveType) sstack.pop();
+                Type t = (Type) sstack.pop();
                 Identifier id = (Identifier) currentToken;
                 if (insideStructDef) {
                     currentStruct.addField(t, id);
@@ -186,39 +238,51 @@ public class CodeGenerator {
                     currentFunction.addArgument(t, id);
                 } else {
                     Variable variable = currentFunction.addVariable(t, id);
-                    this.lastVariable = variable;
+                    sstack.push(variable);
+                    if (t instanceof StructType) {
+                        assign(makeConst(0), variable);
+                    }
                 }
                 break;
             }
-            case "setRHS": {
-                isRightHandSide = true;
+            case "setRHS": {//FIXME: push the result anyhow and pop it after the semicolon
                 break;
             }
             case "assign": {
-                //assign the pushed id to the
-                Variable opr1 = (Variable) sstack.pop();
-                Variable opr2;
-                if (sstack.peek() instanceof Identifier) {
-                    Identifier id = (Identifier) sstack.pop();
-                    opr2 = currentFunction.getVariable(id);
-                    if (opr2 == null)
-                        throw new RuntimeException("Assignment before decleartion of variable " + id.id);
-                } else
-                    opr2 = (Variable) sstack.pop();
 
-                makeIns(":=", opr1, opr2);
-                isRightHandSide = false;
+                if (sstack.peek() instanceof ArrayList) {
+                    ArrayList<Object> tuple1 = (ArrayList<Object>) sstack.pop();
+                    ArrayList<Object> tuple2 = (ArrayList<Object>) sstack.pop();
+                    if (tuple1.size() != tuple2.size())
+                        throw new RuntimeException("Tuple sizes are not equal for assignment");
+                    for (int i = 0; i < tuple1.size(); i++) {
+                        assign((Variable) tuple1.get(i), tuple2.get(i));
+                    }
+                } else if (!sstack.peek().equals("struct_assign_fin")) {//struct assignment is handled elsewhere
+                    Variable opr1 = (Variable) sstack.pop();
+                    assign(opr1, sstack.pop());
+                }
                 break;
             }
             case "assignDeclared": {
                 if (insideFuncDef || insideStructDef)
                     throw new RuntimeException("Can't assign variable inside declaration");
-                makeIns(":=", (Variable) sstack.pop(), lastVariable);
+                if (sstack.peek().equals("struct_assign_fin")) {//struct assignment is handled elsewhere
+                    break;
+                }
+                Variable value = (Variable) sstack.pop();
+                Variable variable = (Variable) sstack.pop();
+                makeIns(":=", value, variable);
+                sstack.push(variable);
                 break;
             }
             case "startFunc": {
                 sstack.push("start_function");
                 insideFuncDef = true;
+                break;
+            }
+            case "STMTFin": {
+                sstack.pop();
                 break;
             }
             case "finFuncSignature": {
@@ -230,7 +294,7 @@ public class CodeGenerator {
                     throw new RuntimeException("Duplicate function decleration with name: " + f.id);
                 while (!sstack.peek().equals("start_function"))//reading return types
                 {
-                    f.return_types.add(0, (PrimitiveType) sstack.pop());
+                    f.return_types.add(0, (Type) sstack.pop());
                 }
                 functionsHashMap.put(f.id, f);
                 currentFunction = f;
@@ -299,6 +363,7 @@ public class CodeGenerator {
                 System.out.println("sem = " + sem);
                 //pop from the sstack and fill anything necessary
                 //pop from loop stack
+                sstack.push("dummy");
                 break;
             }
             case "break": {
@@ -306,6 +371,7 @@ public class CodeGenerator {
                 l.breakAddrs.add(PC);
                 instructions.add("");
                 PC++;
+                sstack.push("dummy");
                 break;
             }
             case "continue": {
@@ -313,6 +379,7 @@ public class CodeGenerator {
                 l.continueAddrs.add(PC);
                 instructions.add("");
                 PC++;
+                sstack.push("dummy");
                 break;
             }
 
@@ -337,6 +404,8 @@ public class CodeGenerator {
                 ArrayList<Variable> args = new ArrayList<>();
                 while (!sstack.peek().equals("start_function_args"))//reading return types
                 {
+                    if (!(sstack.peek() instanceof Variable))
+                        throw new RuntimeException("id not exists");
                     Variable var = (Variable) sstack.pop();
                     args.add(var);
                 }
@@ -346,19 +415,20 @@ public class CodeGenerator {
                     if (args.size() != 1)
                         throw new RuntimeException("write function gets only one parameter");
                     Variable writeVar = args.get(0);
-                    switch (writeVar.type) {
-                        case INT:
+                    switch (writeVar.type.type) {
+                        case "int":
                             makeIns("wi", writeVar);
                             break;
-                        case REAL:
+                        case "real":
                             makeIns("wf", writeVar);
                             break;
-                        case CHAR:
+                        case "char":
                             makeIns("wt", writeVar);
                             break;
                         default:
                             throw new RuntimeException("Can't write such variable");
                     }
+                    sstack.push("dummy");//dummy result of write function
                     break;
                 }
                 if (!functionsHashMap.containsKey(functionName))
@@ -369,13 +439,15 @@ public class CodeGenerator {
             }
             case "return": {
                 //FIXME multi return, check return type
-                Identifier id = (Identifier) currentToken;
-                Variable variable = currentFunction.getVariable(id);
-                if (variable == null)
-                    throw new RuntimeException("returning unidentified identifier");
-                makeIns(":=", variable, FUNCTION_RESULT);
-                end_current_function();
-                break;
+                throw new RuntimeException("Use parenthesis for return");
+//                Identifier id = (Identifier) currentToken;
+//                Variable variable = currentFunction.getVariable(id);
+//                if (variable == null)
+//                    throw new RuntimeException("returning unidentified identifier");
+//                makeIns(":=", variable, FUNCTION_RESULT);
+//                sstack.push("dummy");//dummy for STMTFin
+//                end_current_function();
+//                break;
             }
 
             case "finIfCondition": {
@@ -419,30 +491,92 @@ public class CodeGenerator {
                 if (!sstack.pop().equals("end_if"))
                     throw new RuntimeException();
                 sstack.pop();
+                sstack.push("dummy");
                 break;
             }
             case "returnStart": {
+                sstack.push("return_start");
                 break;
             }
             case "returnId": {
                 // check case "return"
+                Identifier id = (Identifier) currentToken;
+                Variable variable = currentFunction.getVariable(id);
+                if (variable == null)
+                    throw new RuntimeException("returning unidentified identifier");
+                sstack.push(variable);
                 break;
             }
-            case "returnFin":
+            case "returnFin": {
+                ArrayList<Variable> return_tuple = new ArrayList<>();
+                while (!sstack.peek().equals("return_start"))//reading return vars
+                {
+                    return_tuple.add(0, (Variable) sstack.pop());
+                }
+                ArrayList<Variable> return_vars = currentFunction.getReturnVars();
+                if (return_tuple.size() != currentFunction.return_types.size())
+                    throw new RuntimeException("Return tuple size is not equal to the signature, expected: " + currentFunction.return_types.size() + " but found " + return_tuple.size());
+                for (int i = 0; i < return_tuple.size(); i++) {
+                    if (!(return_tuple.get(i).type.equals(currentFunction.return_types.get(i))))
+                        throw new RuntimeException("return types are not equal to the signature");
+                    makeIns(":=", return_tuple.get(i), return_vars.get(i));
+                }
+                sstack.push("dummy");//dummy for STMTFin
+                end_current_function();
+                break;
+            }
 
-            case "initTuple":
-            case "addTuple":
-            case "finTuple":
+            case "initTuple": {
+                tupleSize = 1;
+                break;
+            }
+            case "addTuple": {
+                tupleSize++;
+                break;
+            }
+            case "finTuple": {
+                ArrayList<Object> tuple = new ArrayList<>();
+                for (int i = 0; i < tupleSize; i++)
+                    tuple.add(0, sstack.pop());
+                sstack.push(tuple);
+                break;
+            }
 
-            case "assignStructEnd":// implement the scanner too
-            case "assignStructStart":
-            case "assignStructEndEmpty":
-            case "assignStructEmpty":
+            case "assignStructStart": {
+                insideStructAssign = true;
+                sstack.push("struct_assign");
+                break;
+            }
+            case "assignStructEnd": {
+                finishStructAssign();
+                break;
+            }
+            case "assignStructEndEmpty": {
+                sstack.push("");
+                finishStructAssign();
+                break;
+            }
+            case "assignStructEmpty": {
+                sstack.push("");
+                break;
+            }
             case "structEnd": {
                 insideStructDef = false;
                 currentStruct = null;
                 break;
             }
+
+            case "subStruct": {
+                Variable structVar = (Variable) sstack.pop();
+                if (!(structVar.type instanceof StructType))
+                    throw new RuntimeException("Variable is not of struct type");
+                StructType structType = (StructType) structVar.type;
+                Identifier id = (Identifier) currentToken;
+                makeIns("+", makeConst(structType.getFieldOffset(id)), structVar, AX);
+                sstack.push(new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, structType.getFieldType(id), AX.value));
+                break;
+            }
+
             case "structVar": {
                 break;
             }
@@ -454,9 +588,23 @@ public class CodeGenerator {
                 break;
             }
 
-            case "envEnd":
-            case "envVar":
-            case "envId":
+
+            case "envEnd": {
+                insideEnvDef = false;
+                currentFunction.currentEnv = Scope.DEFAULT_ENV;
+                break;
+            }
+
+            case "envVar": {
+                break;
+            }
+
+            case "envId": {
+                insideEnvDef = true;
+                currentFunction.currentEnv = ((Identifier) currentToken);
+                currentFunction.getLastScope().envs.put(currentFunction.currentEnv, new HashMap<>());
+                break;
+            }
 
             case "labelId": {
                 currentFunction.addLabel((Identifier) currentToken, PC);
@@ -468,17 +616,77 @@ public class CodeGenerator {
                 PC++;
                 break;
             }
+            case "blockStart": {
+                currentFunction.scopes.add(new Scope());
+                break;
+            }
 
-            case "blockFin"://FIXME add in piegon
-            {
+            case "blockFin": {
                 for (Map.Entry<Integer, Identifier> entry : currentFunction.getLastScope().labelJumps.entrySet()) {
                     int pc = currentFunction.getLabel(entry.getValue());
                     if (pc == -1)
                         throw new RuntimeException("Label " + currentToken.parser_token + " doesn't exist for goto");
                     instructions.set(entry.getKey(), getIns("jmp", makeConst(pc)));
                 }
-                //iterate jumps and make instructions
                 currentFunction.popLastScope();
+                break;
+            }
+
+            case "caseExpr": {
+
+                Variable expr = (Variable) sstack.pop();
+                if (!expr.type.type.equals("int"))
+                    throw new RuntimeException("Case expression should be integer");
+                PC++;
+                instructions.add("");//jmp to end of cases
+                Case item = new Case(PC, expr);
+                PC++;
+                instructions.add("");//jmp to codes after the block
+                currentFunction.caseStack.push(item);
+                break;
+            }
+            case "caseBlock": {
+                Case currentCase = currentFunction.caseStack.peek();
+                makeIns("jmp", makeConst(currentCase.break_jmp_addr));
+                break;
+            }
+            case "caseEnd": {
+                Case currentCase = currentFunction.caseStack.peek();
+                instructions.set(currentCase.break_jmp_addr - 1, getIns("jmp", makeConst(PC)));
+                makeIns("<=", currentCase.expr, makeConst(currentCase.max_val), TMP_BOOL);
+                makeIns("jz", TMP_BOOL, makeConst(currentCase.break_jmp_addr));
+                makeIns("<=", makeConst(currentCase.min_val), currentCase.expr, TMP_BOOL);
+                makeIns("jz", TMP_BOOL, makeConst(currentCase.break_jmp_addr));
+                makeIns("-", currentCase.expr, makeConst(currentCase.min_val - (PC + 2)), AX);
+                makeIns("jmp", AX);
+                int tableStart = PC;
+                for (int i = currentCase.min_val; i <= currentCase.max_val; i++)
+                    makeIns("jmp", makeConst(currentCase.break_jmp_addr));
+                // make jump table
+                for (Map.Entry<Integer, Integer> entry : currentCase.const_to_addr.entrySet()) {
+                    Integer calculated_postition = entry.getKey() - currentCase.min_val + tableStart;
+                    instructions.set(calculated_postition, getIns("jmp", makeConst(entry.getValue())));
+                }
+                // fill final jump position
+                instructions.set(currentCase.break_jmp_addr, getIns("jmp", makeConst(PC)));
+                currentFunction.caseStack.pop();
+                break;
+            }
+            case "caseConst": {
+                Variable const_val = (Variable) sstack.pop();
+                if (!const_val.type.type.equals("int"))
+                    throw new RuntimeException("Cases should be integer");
+                if (const_val.mode != Variable.ADDR_MODE.IMMEDIATE)
+                    throw new RuntimeException("Cases should be constant values");
+                Case currentCase = currentFunction.caseStack.peek();
+                Integer key = Integer.valueOf(const_val.value);
+                if (currentCase.const_to_addr.size() == 0) {
+                    currentCase.min_val = key;
+                    currentCase.max_val = key;
+                }
+                currentCase.min_val = Math.min(currentCase.min_val, key);
+                currentCase.max_val = Math.max(currentCase.max_val, key);
+                currentCase.const_to_addr.put(key, PC);
                 break;
             }
 
@@ -497,6 +705,34 @@ public class CodeGenerator {
         }
     }
 
+    private void finishStructAssign() {
+        ArrayList<Object> vars = new ArrayList<>();
+        while (!sstack.peek().equals("struct_assign"))//reading return types
+            vars.add(0, sstack.pop());
+        sstack.pop();//popping struct_assign
+        Variable structVar = (Variable) sstack.pop();
+        if (!(structVar.type instanceof StructType)) {
+            throw new RuntimeException("Assigning primitive type with struct assignment syntax");
+        }
+        StructType structType = (StructType) structVar.type;
+        if (vars.size() != ((StructType) structVar.type).fields.size()) {
+            throw new RuntimeException("Number of struct fields doesn't match with assignment expression");
+        }
+        makeIns("gmm", makeConst(structType.getStructSize()), structVar);
+        for (int i = 0; i < structType.fields.size(); i++) {
+            Map.Entry<Identifier, Type> field = structType.fields.get(i);
+            makeIns("+", makeConst(structType.getFieldOffset(field.getKey())), structVar, AX);
+            Object opr2 = vars.get(i);
+            if (opr2.equals("")) {
+                if (field.getValue() instanceof StructType)
+                    assign(makeConst(0), new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, field.getValue(), AX.value));
+            } else
+                assign((Variable) opr2, new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, field.getValue(), AX.value));
+        }
+        sstack.push("struct_assign_fin");
+        insideStructAssign = false;
+    }
+
     private void end_current_function() {
         pop(currentFunction.localVarsSize);
         makeIns(":=", currentFunction.return_addr, AX);
@@ -509,23 +745,23 @@ public class CodeGenerator {
             case "CHAR": {
                 //Trim the single quotes
                 String charValue = currentToken.value.substring(1, currentToken.value.length() - 1);
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.CHAR, charValue);
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "char"), charValue);
             }
             case "REAL": {
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.REAL, String.valueOf(Double.parseDouble(currentToken.value)));
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "real"), String.valueOf(Double.parseDouble(currentToken.value)));
             }
             case "HEX": {
                 //Trim the leading 0x
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(currentToken.value.substring(2), 16));
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, Integer.parseInt(currentToken.value.substring(2), 16));
             }
             case "INT": {
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.INT, Integer.parseInt(currentToken.value));
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, Integer.parseInt(currentToken.value));
             }
             case "BOOL": {
                 if (currentToken.value.equals("false"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, "false");
+                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "false");
                 else if (currentToken.value.equals("true"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, Variable.TYPE.BOOL, "true");
+                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "true");
                 else
                     throw new RuntimeException("Boolean with value other than true or false");
             }
@@ -547,7 +783,7 @@ public class CodeGenerator {
         if (arguments.size() != f.argsOrder.size())
             throw new RuntimeException("Arguments number is not correct");
         for (int i = arguments.size() - 1; i >= 0; i--) {
-            if (arguments.get(i).type != f.argsOrder.get(i).type)
+            if (!(arguments.get(i).type.equals(f.argsOrder.get(i).type)))
                 throw new RuntimeException("Argument types are not the same");
             push(arguments.get(i));
         }
@@ -558,10 +794,18 @@ public class CodeGenerator {
         makeIns("sp:=", SP);
         makeIns("jmp", makeConst(f.start_PC));
         instructions.set(jump_instruction, getIns(":=", makeConst(PC), SP_place));
-        if (currentFunction != null && isRightHandSide) {
-            Variable result = currentFunction.getTempInt();
-            makeIns(":=", FUNCTION_RESULT, result);
-            sstack.push(result);
+        if (currentFunction != null) {//not calling main itself
+            ArrayList<Variable> return_vars = f.getReturnVars();
+            ArrayList<Variable> result_vars = new ArrayList<>();
+            for (Variable return_var : return_vars) {
+                Variable result = currentFunction.getTemp(return_var.type);
+                makeIns(":=", return_var, result);
+                result_vars.add(result);
+            }
+            if (result_vars.size() == 1)
+                sstack.push(result_vars.get(0));
+            else
+                sstack.push(result_vars);
         }
     }
 
@@ -637,5 +881,17 @@ public class CodeGenerator {
 
     public StructType getStruct(String yytext) {
         return (structsHashMap.getOrDefault(yytext, null));
+    }
+
+    void assign(Variable opr1, Object _opr2) {
+        Variable opr2;
+        if (_opr2 instanceof Identifier) {
+            Identifier id = (Identifier) _opr2;
+            opr2 = currentFunction.getVariable(id);
+            if (opr2 == null)
+                throw new RuntimeException("Assignment before declaration of variable " + id.id);
+        } else
+            opr2 = (Variable) _opr2;
+        makeIns(":=", opr1, opr2);
     }
 }

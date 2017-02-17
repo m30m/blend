@@ -4,65 +4,33 @@
 class Variable {
     enum ADDR_MODE {GLOBAL_DIRECT, GLOBAL_INDIRECT, LOCAL_DIRECT, LOCAL_INDIRECT, IMMEDIATE}
 
-    enum TYPE {INT, REAL, BOOL, STRING, CHAR}
 
 
     ADDR_MODE mode;
-    TYPE type;
+    Type type;
     String value;
 
-    public Variable(ADDR_MODE mode, TYPE type, int value) {
+    public Variable(ADDR_MODE mode, Type type, int value) {
         this.mode = mode;
         this.type = type;
         this.value = String.valueOf(value);
     }
 
-    public Variable(ADDR_MODE mode, TYPE type, String value) {
+    public Variable(ADDR_MODE mode, Type type, String value) {
         this.mode = mode;
         this.type = type;
         this.value = value;
     }
 
     public int getByteSize() {
-        switch (type) {
-            case STRING:
-                return 4;
-            case INT:
-                return 4;
-            case REAL:
-                return 4;
-            case CHAR:
-                return 1;
-            case BOOL:
-                return 1;
-//            case "long": // FIXME
-//                return 8;
-        }
-        throw new RuntimeException("Unknown type");
+        return type.getByteSize();
     }
 
     @Override
     public String toString() {
         String modeStr = modeToStr(mode);
-        String typeStr = typeToStr(type);
+        String typeStr = type.typeToVMStr();
         return modeStr + typeStr + value;
-    }
-
-    private String typeToStr(TYPE type) {
-        switch (type) {
-
-            case INT:
-                return "i_";
-            case REAL:
-                return "f_";
-            case BOOL:
-                return "b_";
-            case STRING:
-                return "s_";
-            case CHAR:
-                return "c_";
-        }
-        return "ERR";
     }
 
     private String modeToStr(ADDR_MODE mode) {

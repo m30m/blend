@@ -1,20 +1,26 @@
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+
 public class Program {
     // Address of PGen output table.
     public static final String stPath = "all.npt";
 
     public static String inputPath = "";
     public static String outputPath = "";
+    public static String resPath = "";
 
     public static void main(String[] args) {
 
-        if (args.length != 2) {
+        if (args.length != 1) {
             System.err.println("Wrong parameters passed.");
             System.err.println("Use the following format:");
             System.err.println("java Program inputfilename.L outputfilename.Lm");
             return;
         } else {
             inputPath = args[0];
-            outputPath = args[1];
+            outputPath = inputPath.substring(0, inputPath.lastIndexOf(".blend")) + ".out";
+            resPath = inputPath.substring(0, inputPath.lastIndexOf(".blend")) + ".res";
         }
 
         String[] symbols = null;
@@ -80,13 +86,25 @@ public class Program {
         }
 
         Parser parser = new Parser(inputPath, symbols, parseTable);
-
+        int compileResult = 1;
         try {
             parser.Parse();
         } catch (Exception ex) {
-            System.out.println("Compile Error -> " + ex.getMessage());
+            compileResult = 0;
+            //System.out.println("Compile Error -> " + ex.getMessage());
         }
         parser.WriteOutput(outputPath);
+
+        {
+            try {
+                PrintWriter writer = new PrintWriter(resPath, "UTF-8");
+                Identifier id = new Identifier("id", "main");
+                writer.print(compileResult);
+                writer.close();
+            } catch (IOException e) {
+                // do something
+            }
+        }
     }
 
     static boolean FileExists(String path) {

@@ -92,7 +92,6 @@ public class Parser {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println("token.type = " + currentToken.parser_token);
         int i;
         for (i = 0; i < symbols.length; i++) {
             if (symbols[i].equals(currentToken.parser_token))

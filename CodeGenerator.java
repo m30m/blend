@@ -163,7 +163,7 @@ public class CodeGenerator {
     }
 
     public void Generate(String sem, Token currentToken) {
-        System.out.println(sem); // Just for debug
+        //System.out.println(sem); // Just for debug
 
         switch (sem) {
             case "NoSem":
@@ -340,7 +340,7 @@ public class CodeGenerator {
                 currentFunction.loopStack.push(l);
                 //fill the loop stack with block start
                 //push to loop stack
-                System.out.println("sem = " + sem);
+                //System.out.println("sem = " + sem);
                 break;
             }
             case "startWhileBlock": {
@@ -358,11 +358,11 @@ public class CodeGenerator {
                 //done
                 currentFunction.loopStack.push(new Loop());
                 //push to loop stack
-                System.out.println("sem = " + sem);
+                //System.out.println("sem = " + sem);
                 break;
             }
             case "finWhileCondition": {
-                System.out.println("sem = " + sem);
+                //System.out.println("sem = " + sem);
                 Loop l = currentFunction.loopStack.peek();
                 Variable var = (Variable) sstack.pop();
                 l.conditionVar = var;
@@ -379,7 +379,7 @@ public class CodeGenerator {
                 Loop l = currentFunction.loopStack.peek();
                 l.whileAddr = PC;
                 //fill the loop stack check address
-                System.out.println("sem = " + sem);
+                //System.out.println("sem = " + sem);
                 break;
             }
             case "finLoop": {
@@ -392,7 +392,7 @@ public class CodeGenerator {
                 instructions.set(l.jzAddr, getIns("jz", l.conditionVar, makeConst(l.endAddr)));
                 instructions.set(l.jmpAddr, getIns("jmp", makeConst(l.startAddr)));
                 //fill the loop stack with the next address
-                System.out.println("sem = " + sem);
+                //System.out.println("sem = " + sem);
                 //pop from the sstack and fill anything necessary
                 //pop from loop stack
                 sstack.push("dummy");
@@ -844,7 +844,7 @@ public class CodeGenerator {
             case "pushArg":
                 return;
             default: {
-                System.out.println("Unknown sem = " + sem);
+                //System.out.println("Unknown sem = " + sem);
                 throw new RuntimeException("Unknown sem = " + sem);
 //                return;
             }

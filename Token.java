@@ -45,6 +45,11 @@ class Literal extends Token {
         this.type = type;
         this.value = value;
     }
+    public Literal(String parser_token, String type, char value) {
+        super(parser_token);
+        this.type = type;
+        this.value = String.valueOf(value);
+    }
 }
 
 abstract class Type extends Token {

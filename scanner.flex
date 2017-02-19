@@ -42,12 +42,13 @@ CommentContent       = ( [^*] | \*+ [^/*] )*
 
 Identifier = [:jletter:] [:jletterdigit:]*
 
-DecIntegerLiteral = [0-9]+
+DecIntegerLiteral = 0 | [1-9][0-9]*
 HexIntegerLiteral = 0x[0-9]*
 RealLiteral = [0-9]+\.[0-9]* | [0-9]*\.[0-9]+
-CharLiteral = '[^']' | '\''
+SingleCharacter = [^\r\n\'\\]
 
 %state STRING
+%state CHARLITERAL
 
 %%
 
@@ -80,7 +81,7 @@ CharLiteral = '[^']' | '\''
 <YYINITIAL> "string"                    { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "structure"                 { return new Token(yytext()); }
 <YYINITIAL> "true"                      { return new Literal("const", "BOOL", yytext()); }
-<YYINITIAL> "void"                      { return new Token(yytext()); }
+<YYINITIAL> "void"                      { return new PrimitiveType("type", yytext()); }
 <YYINITIAL> "while"                     { return new Token(yytext()); }
 
 <YYINITIAL> {
@@ -90,9 +91,9 @@ CharLiteral = '[^']' | '\''
   /* literals */
   {HexIntegerLiteral}            { return new Literal("const", "HEX", yytext()); }
   {RealLiteral}                  { return new Literal("const", "REAL", yytext()); }
-  {CharLiteral}                  { return new Literal("const", "CHAR", yytext()); }
   {DecIntegerLiteral}            { return new Literal("const", "INT", yytext()); }
   \"                             { string.setLength(0); yybegin(STRING); }
+  \'                             { string.setLength(0); yybegin(CHARLITERAL); }
 
   /* syntax */
   "."                            { return new Token(yytext()); }
@@ -151,6 +152,24 @@ CharLiteral = '[^']' | '\''
   \\r                            { string.append('\r'); }
   \\\"                           { string.append('\"'); }
   \\                             { string.append('\\'); }
+}
+
+<CHARLITERAL> {
+  {SingleCharacter}\'            { yybegin(YYINITIAL); return new Literal("const", "CHAR", yytext().charAt(0)); }
+
+  /* escape sequences */
+  "\\b"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\b');}
+  "\\t"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\t');}
+  "\\n"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\n');}
+  "\\f"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\f');}
+  "\\r"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\r');}
+  "\\\""\'                       { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\"');}
+  "\\'"\'                        { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\'');}
+  "\\\\"\'                       { yybegin(YYINITIAL); return new Literal("const", "CHAR", '\\'); }
+
+  /* error cases */
+  \\.                            { throw new RuntimeException("Illegal escape sequence \""+yytext()+"\""); }
+  {LineTerminator}               { throw new RuntimeException("Unterminated character literal at end of line"); }
 }
 
 /* error fallback */

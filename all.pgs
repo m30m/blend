@@ -534,7 +534,7 @@
         "start": 26,
         "end": 23,
         "token": "E_UNARY",
-        "func": "",
+        "func": "BIN_MOD",
         "anchorX": 446.0,
         "anchorY": 229.0,
         "isGraph": true,

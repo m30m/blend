@@ -137,8 +137,11 @@ class Function {
         int offset = RETURN_START_ADDR;
         ArrayList<Variable> return_vars = new ArrayList<>();
         for (Type return_type : return_types) {
+            if (return_type.type.equals("void"))
+                continue;
             return_vars.add(new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, return_type, offset));
             offset += return_type.getByteSize();
+
         }
         return return_vars;
     }

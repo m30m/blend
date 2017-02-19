@@ -87,6 +87,7 @@ public class CodeGenerator {
     Variable SP_place;
     Variable AX;
     Variable TMP_BOOL; // used for switch case
+    Variable TMP_CHAR;
     Variable FUNCTION_RESULT;
     static Type intType = new PrimitiveType("type", "int");
 
@@ -113,6 +114,7 @@ public class CodeGenerator {
         this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 4);
         this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 8);
         this.TMP_BOOL = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "bool"), 12);
+        this.TMP_CHAR = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "char"), 13);
         this.currentFunction = null;
         makeIns("jmp", makeConst(0));//the value of jmp is not important since it will be overwritten in the end
     }
@@ -258,9 +260,12 @@ public class CodeGenerator {
                     for (int i = 0; i < tuple1.size(); i++) {
                         assign((Variable) tuple1.get(i), tuple2.get(i));
                     }
+                    sstack.push(tuple2);
                 } else if (!sstack.peek().equals("struct_assign_fin")) {//struct assignment is handled elsewhere
                     Variable opr1 = (Variable) sstack.pop();
-                    assign(opr1, sstack.pop());
+                    Object assigned_var = sstack.pop();
+                    assign(opr1, assigned_var);
+                    sstack.push(assigned_var);
                 }
                 break;
             }
@@ -425,9 +430,17 @@ public class CodeGenerator {
                         case "char":
                             makeIns("wt", writeVar);
                             break;
+                        case "bool":
+                            assign(makeConst(0), AX);
+                            assign(writeVar, AX);
+                            makeIns("wi", AX);
+                            break;
                         default:
                             throw new RuntimeException("Can't write such variable");
                     }
+                    sstack.push("dummy");//dummy result of write function
+                    break;
+                } else if (functionName.id.equals("isvoid")) {
                     sstack.push("dummy");//dummy result of write function
                     break;
                 }
@@ -490,7 +503,8 @@ public class CodeGenerator {
             case "finCondition": {
                 if (!sstack.pop().equals("end_if"))
                     throw new RuntimeException();
-                sstack.pop();
+                sstack.pop();//PC
+                sstack.pop();//Condition
                 sstack.push("dummy");
                 break;
             }
@@ -513,6 +527,7 @@ public class CodeGenerator {
                 {
                     return_tuple.add(0, (Variable) sstack.pop());
                 }
+                sstack.pop();//pop return_start
                 ArrayList<Variable> return_vars = currentFunction.getReturnVars();
                 if (return_tuple.size() != currentFunction.return_types.size())
                     throw new RuntimeException("Return tuple size is not equal to the signature, expected: " + currentFunction.return_types.size() + " but found " + return_tuple.size());
@@ -596,6 +611,7 @@ public class CodeGenerator {
             }
 
             case "envVar": {
+                sstack.pop();//pop the declared variable
                 break;
             }
 
@@ -694,6 +710,13 @@ public class CodeGenerator {
             case "UNARY_NOT":
             case "COMPLEMENT":
             case "NEGATION":
+            {
+                Variable op1 = (Variable) sstack.pop();
+                Variable tempVar = currentFunction.getTemp(op1.type);
+                makeIns(opToString(sem), op1, tempVar);
+                sstack.push(tempVar);
+                break;
+            }
             case "pushArg":
                 return;
             default: {
@@ -743,9 +766,9 @@ public class CodeGenerator {
     private Variable makeConst(Literal currentToken) {
         switch (currentToken.type) {
             case "CHAR": {
-                //Trim the single quotes
-                String charValue = currentToken.value.substring(1, currentToken.value.length() - 1);
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "char"), charValue);
+                Variable tmpChar = currentFunction.getTemp(new PrimitiveType("type", "char"));
+                assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "int"), currentToken.value.charAt(0)), tmpChar);
+                return tmpChar;
             }
             case "REAL": {
                 return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "real"), String.valueOf(Double.parseDouble(currentToken.value)));
@@ -758,10 +781,14 @@ public class CodeGenerator {
                 return new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, Integer.parseInt(currentToken.value));
             }
             case "BOOL": {
-                if (currentToken.value.equals("false"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "false");
-                else if (currentToken.value.equals("true"))
-                    return new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "true");
+                Variable tmpBool = currentFunction.getTemp(new PrimitiveType("type", "bool"));
+                if (currentToken.value.equals("false")) {
+                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "false"), tmpBool);
+                    return tmpBool;
+                } else if (currentToken.value.equals("true")) {
+                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "true"), tmpBool);
+                    return tmpBool;
+                }
                 else
                     throw new RuntimeException("Boolean with value other than true or false");
             }
@@ -811,6 +838,12 @@ public class CodeGenerator {
 
     private String opToString(String op) {
         switch (op) {
+            case "COMPLEMENT":
+                return "~";
+            case "UNARY_NOT":
+                return "!";
+            case "NEGATION":
+                return "u-";
             case "BIN_DIV":
                 return "/";
             case "BIN_MOD":

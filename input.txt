@@ -25,10 +25,8 @@ function (bool, int) dummy(int k) {
 }
 
 function (void) main() {
-    position shervin2;
-    write(isvoid(shervin2));
-    shervin2:= assign<123, 41>;
-    write(isvoid(shervin2));
-    release shervin2;
-    write(isvoid(shervin2));
+    int a;
+    read(a);
+    a := a+100;
+    write(a);
 }

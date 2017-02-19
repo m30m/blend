@@ -459,6 +459,24 @@ public class CodeGenerator {
                     }
                     break;
                 }
+                else if (functionName.id.equals("read"))
+                {
+                    if (args.size() != 1)
+                        throw new RuntimeException("read function gets only one parameter");
+                    Variable readVar = args.get(0);
+                    switch (readVar.type.type) {
+                        case "int":
+                            makeIns("ri", readVar);
+                            break;
+                        case "real":
+                            makeIns("rf", readVar);
+                            break;
+                        default:
+                            throw new RuntimeException("Can't write such variable");
+                    }
+                    sstack.push("dummy");//dummy result of read function
+                    break;
+                }
                 if (!functionsHashMap.containsKey(functionName))
                     throw new RuntimeException("Function " + functionName.id + " doesn't exist");
                 Function function = functionsHashMap.get(functionName);

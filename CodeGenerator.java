@@ -454,8 +454,12 @@ public class CodeGenerator {
                         case "real":
                             makeIns("wf", writeVar);
                             break;
-                        case "char":
                         case "string":
+                            writeVar.mode= Variable.ADDR_MODE.LOCAL_INDIRECT;
+                            writeVar.type = new PrimitiveType("type","out");
+                            makeIns("wt", writeVar);
+                            break;
+                        case "char":
                             makeIns("wt", writeVar);
                             break;
                         case "bool":
@@ -475,17 +479,13 @@ public class CodeGenerator {
                     if (!(writeVar.type instanceof StructType) && !writeVar.type.isArray) // and array
                     {
                         sstack.push(makeConst(new Literal("const", "BOOL", "false")));//result of isvoid
-                    }
-                    else
-                    {
+                    } else {
                         Variable tmpBool = currentFunction.getTemp(boolType);
-                        makeIns("==",writeVar,makeConst(0),tmpBool);
+                        makeIns("==", writeVar, makeConst(0), tmpBool);
                         sstack.push(tmpBool);
                     }
                     break;
-                }
-                else if (functionName.id.equals("read"))
-                {
+                } else if (functionName.id.equals("read")) {
                     if (args.size() != 1)
                         throw new RuntimeException("read function gets only one parameter");
                     Variable readVar = args.get(0);
@@ -685,10 +685,10 @@ public class CodeGenerator {
                 Variable relVar = getVariableFromId(currentToken);
                 if (relVar.type instanceof StructType) { // and array
                     StructType structType = (StructType) relVar.type;
-                    makeIns("gmm", relVar, makeConst(structType.getStructSize()));
+                    makeIns("fmm", relVar, makeConst(structType.getStructSize()));
                     assign(makeConst(0), relVar);
                 } else if (relVar.type.isArray) {
-                    makeIns("gmm", relVar, getArraySizeVar(relVar));
+                    makeIns("fmm", relVar, getArraySizeVar(relVar));
                     assign(makeConst(0), relVar);
                 } else {
                     throw new RuntimeException("Can' release this kind of variable");
@@ -834,8 +834,7 @@ public class CodeGenerator {
 
             case "UNARY_NOT":
             case "COMPLEMENT":
-            case "NEGATION":
-            {
+            case "NEGATION": {
                 Variable op1 = (Variable) sstack.pop();
                 Variable tempVar = currentFunction.getTemp(op1.type);
                 makeIns(opToString(sem), op1, tempVar);
@@ -895,7 +894,7 @@ public class CodeGenerator {
     private Variable makeConst(Literal currentToken) {
         switch (currentToken.type) {
             case "CHAR": {
-                Variable tmpChar = currentFunction.getTemp(new PrimitiveType("type", "char"));
+                Variable tmpChar = currentFunction.getTemp(charType);
                 assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "int"), currentToken.value.charAt(0)), tmpChar);
                 return tmpChar;
             }
@@ -917,13 +916,21 @@ public class CodeGenerator {
                 } else if (currentToken.value.equals("true")) {
                     assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, boolType, "true"), tmpBool);
                     return tmpBool;
-                }
-                else
+                } else
                     throw new RuntimeException("Boolean with value other than true or false");
             }
-            case "STRING":
-            {
-                return new Variable(Variable.ADDR_MODE.IMMEDIATE, stringType, currentToken.value);
+            case "STRING": {
+                Variable tmpString = currentFunction.getTemp(stringType);
+                makeIns("gmm", makeConst(currentToken.value.length() + 1), tmpString);
+                assign(tmpString, AX);
+                Variable pointer = new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, charType, AX.value);
+                for (int i = 0; i < currentToken.value.length(); i++) {
+                    char value = currentToken.value.charAt(i);
+                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "int"), value), pointer);
+                    makeIns("+", AX, makeConst(1), AX);
+                }
+                assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "int"), 0), pointer);
+                return tmpString;
             }
         }
         throw new RuntimeException("Unknown type for const: " + currentToken.type);

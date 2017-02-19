@@ -134,6 +134,8 @@ class PrimitiveType extends Type {
             case "bool":
                 return "b_";
             case "string":
+                return "i_";
+            case "out":
                 return "s_";
             case "char":
                 return "c_";

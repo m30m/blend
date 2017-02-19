@@ -90,6 +90,9 @@ public class CodeGenerator {
     Variable TMP_CHAR;
     Variable FUNCTION_RESULT;
     static Type intType = new PrimitiveType("type", "int");
+    static Type boolType = new PrimitiveType("type", "bool");
+    static Type realype = new PrimitiveType("type", "real");
+    static Type charType = new PrimitiveType("type", "char");
 
     Stack<Object> sstack;
 
@@ -113,7 +116,7 @@ public class CodeGenerator {
         this.SP_place = new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, intType, 0);
         this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 4);
         this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 8);
-        this.TMP_BOOL = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "bool"), 12);
+        this.TMP_BOOL = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, boolType, 12);
         this.TMP_CHAR = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "char"), 13);
         this.currentFunction = null;
         makeIns("jmp", makeConst(0));//the value of jmp is not important since it will be overwritten in the end
@@ -441,7 +444,19 @@ public class CodeGenerator {
                     sstack.push("dummy");//dummy result of write function
                     break;
                 } else if (functionName.id.equals("isvoid")) {
-                    sstack.push("dummy");//dummy result of write function
+                    if (args.size() != 1)
+                        throw new RuntimeException("isvoid function gets only one parameter");
+                    Variable writeVar = args.get(0);
+                    if(!(writeVar.type instanceof StructType)) // and array
+                    {
+                        sstack.push(makeConst(new Literal("const", "BOOL", "false")));//result of isvoid
+                    }
+                    else
+                    {
+                        Variable tmpBool = currentFunction.getTemp(boolType);
+                        makeIns("==",writeVar,makeConst(0),tmpBool);
+                        sstack.push(tmpBool);
+                    }
                     break;
                 }
                 if (!functionsHashMap.containsKey(functionName))
@@ -781,12 +796,12 @@ public class CodeGenerator {
                 return new Variable(Variable.ADDR_MODE.IMMEDIATE, intType, Integer.parseInt(currentToken.value));
             }
             case "BOOL": {
-                Variable tmpBool = currentFunction.getTemp(new PrimitiveType("type", "bool"));
+                Variable tmpBool = currentFunction.getTemp(boolType);
                 if (currentToken.value.equals("false")) {
-                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "false"), tmpBool);
+                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, boolType, "false"), tmpBool);
                     return tmpBool;
                 } else if (currentToken.value.equals("true")) {
-                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, new PrimitiveType("type", "bool"), "true"), tmpBool);
+                    assign(new Variable(Variable.ADDR_MODE.IMMEDIATE, boolType, "true"), tmpBool);
                     return tmpBool;
                 }
                 else

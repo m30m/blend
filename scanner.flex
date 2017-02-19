@@ -69,7 +69,6 @@ SingleCharacter = [^\r\n\'\\]
 <YYINITIAL> "goto"                      { return new Token(yytext()); }
 <YYINITIAL> "if"                        { return new Token(yytext()); }
 <YYINITIAL> "int"                       { return new PrimitiveType("type", yytext()); }
-<YYINITIAL> "isvoid"                    { return new Token(yytext()); }
 <YYINITIAL> "label"                     { return new Token(yytext()); }
 <YYINITIAL> "late"                      { return new Token(yytext()); }
 <YYINITIAL> "long"                      { return new PrimitiveType("type", yytext()); }

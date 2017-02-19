@@ -629,6 +629,18 @@ public class CodeGenerator {
                 sstack.pop();//pop the declared variable
                 break;
             }
+            case "releaseId": {
+                Variable relVar = getVariableFromId(currentToken);
+                if (!(relVar.type instanceof StructType)) // and array
+                    throw new RuntimeException("Can' release this kind of variable");
+                else {
+                    StructType structType = (StructType) relVar.type;
+                    makeIns("gmm", relVar, makeConst(structType.getStructSize()));
+                    assign(makeConst(0), relVar);
+                }
+                sstack.push("dummy");//dummy for STMTFin
+                break;
+            }
 
             case "envId": {
                 insideEnvDef = true;
@@ -933,6 +945,12 @@ public class CodeGenerator {
 
     void assign(Variable opr1, Object _opr2) {
         Variable opr2;
+        opr2 = getVariableFromId(_opr2);
+        makeIns(":=", opr1, opr2);
+    }
+
+    private Variable getVariableFromId(Object _opr2) {
+        Variable opr2;
         if (_opr2 instanceof Identifier) {
             Identifier id = (Identifier) _opr2;
             opr2 = currentFunction.getVariable(id);
@@ -940,6 +958,6 @@ public class CodeGenerator {
                 throw new RuntimeException("Assignment before declaration of variable " + id.id);
         } else
             opr2 = (Variable) _opr2;
-        makeIns(":=", opr1, opr2);
+        return opr2;
     }
 }

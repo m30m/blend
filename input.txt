@@ -29,4 +29,6 @@ function (void) main() {
     write(isvoid(shervin2));
     shervin2:= assign<123, 41>;
     write(isvoid(shervin2));
+    release shervin2;
+    write(isvoid(shervin2));
 }

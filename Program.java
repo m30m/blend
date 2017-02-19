@@ -30,7 +30,7 @@ public class Program {
             System.out.println("File not found: " + stPath + " or " + inputPath);
             return;
         }
-        int compileResult = 1;
+
         try {
             int rowSize, colSize;
             String[] tmpArr;
@@ -81,15 +81,12 @@ public class Program {
             }
 
         } catch (Exception ex) {
-//            System.out.println("Compile Error -> " + ex.getMessage());
-            compileResult=0;
-            writeResFile(compileResult);
-            dummyOutFile();
+            System.out.println("Compile Error -> " + ex.getMessage());
             return;
         }
 
         Parser parser = new Parser(inputPath, symbols, parseTable);
-
+        int compileResult = 1;
         try {
             parser.Parse();
         } catch (Exception ex) {
@@ -97,27 +94,16 @@ public class Program {
             //System.out.println("Compile Error -> " + ex.getMessage());
         }
         parser.WriteOutput(outputPath);
-        writeResFile(compileResult);
-    }
 
-    private static void writeResFile(int compileResult) {
-        try {
-            PrintWriter writer = new PrintWriter(resPath, "UTF-8");
-            Identifier id = new Identifier("id", "main");
-            writer.print(compileResult);
-            writer.close();
-        } catch (IOException e) {
-            // do something
-        }
-    }
-
-    private static void dummyOutFile() {
-        try {
-            PrintWriter writer = new PrintWriter(outputPath, "UTF-8");
-            Identifier id = new Identifier("id", "main");
-            writer.close();
-        } catch (IOException e) {
-            // do something
+        {
+            try {
+                PrintWriter writer = new PrintWriter(resPath, "UTF-8");
+                Identifier id = new Identifier("id", "main");
+                writer.print(compileResult);
+                writer.close();
+            } catch (IOException e) {
+                // do something
+            }
         }
     }
 

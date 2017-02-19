@@ -1,37 +1,105 @@
-structure struct
-{
-    bool d1;
-    int a2;
-    char d3;
-    string d4;
+structure position {
+    int x;
+    int y;
 }
 
-function (int) main()
-{
-    struct data;
-    if(isvoid(data)) {
-        write("NULL\n");
+structure person {
+    position pos;
+    char initial;
+}
+
+function (int) fib(int n) {
+    if (n = 0 || n = 1) {
+      int res := 1;
+      return (res);
     };
-    data := assign <true,, 'c', "string">;
 
-    array int arr := [3, 4, 5] assign;
+    int res := fib(n - 1) + fib(n - 2);
+    return (res);
+}
 
-    arr[0, 0, 0] := 983;
-    arr[2, 1, 2] := -4;
+function (bool, int) dummy(int k) {
+    bool res1 := k < 5;
+    int res2 := k + 1;
+    return (res1, res2);
+}
 
-    write(data.d1);
-    write("\n");
-    write(data.d2);
-    write("\n");
-    write(data.d3);
-    write("\n");
-    write(data.d4);
-    write("\n");
-    write(a[2, 1, 2]);
-
-    release data;
-    release arr;
-
-    int ret := 0;
-    return(ret);
+function (void) main() {
+    int kop := 1;
+    while (kop < 10) {
+        environment inside {
+            int a := 7;
+            char b;
+        };
+        write(kop);
+        if (kop = 5) {
+            write(::inside.a);
+            kop := kop + 2;
+            continue;
+        };
+        kop := kop + 1;
+    };
+    char ch := 'a';
+    do {
+      write(ch);
+      if (ch = 'm') {
+          break;
+      };
+      ch := ch + 1;
+    } while (ch <= 'z');
+    write('\n');
+    int b := 7;
+    int a := 5 * -7 + 74 % 6;
+    char c := '\n'; --me
+    write(a);
+    write(c);
+    write(fib(11));
+    write('\n');
+    bool hi := 33;
+    write(hi);
+    write('\n');
+    int tst1 := -1098.75;
+    write(tst1);
+    write('\n');
+    real tst2 := tst1;
+    write(tst2);
+    write('\n');
+    int a1;
+    real a2;
+    char a3;
+    (a1, a2, a3) := (a, 7, 97);
+    write(a1);
+    write('#');
+    write(a2);
+    write('#');
+    write(a3);
+    write('\n');
+    bool a4;
+    (a4, a1) := dummy(7);
+    write(a4);
+    write('%');
+    write(a1);
+    write('\n');
+    int chose := 3;
+    case chose + 1 of
+        3: {write('A');}
+        4: {write('B');}
+        5: {write('C');}
+    endcase;
+    write('\n');
+    position pos;
+    pos := assign<3,>;
+    write(pos.x);
+    write('#');
+    write(pos.y);
+    write('\n');
+    person shervin := assign<pos, 'S'>;
+    write(shervin.initial);
+    write(':');
+    write(shervin.pos.x);
+    write(',');
+    write(shervin.pos.y);
+    write('\n');
+    write(3.5 + true + '\n');
+    write('\n');
 }

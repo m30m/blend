@@ -25,8 +25,7 @@ function (bool, int) dummy(int k) {
 }
 
 function (void) main() {
-    int a;
-    read(a);
-    a := a+100;
-    write(a);
+    char c;
+    read(c);
+    write(c);
 }

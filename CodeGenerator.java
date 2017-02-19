@@ -471,6 +471,13 @@ public class CodeGenerator {
                         case "real":
                             makeIns("rf", readVar);
                             break;
+                        case "char":
+                            makeIns("rt", readVar);
+                            break;
+                        case "bool":
+                            makeIns("ri", AX);
+                            makeIns("!=", AX, makeConst(0), readVar);
+                            break;
                         default:
                             throw new RuntimeException("Can't write such variable");
                     }

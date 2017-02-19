@@ -54,13 +54,27 @@ class Literal extends Token {
 
 abstract class Type extends Token {
     String type;
+    boolean isArray;
+
+    public Type(String parser_token, String type, boolean isArray) {
+        super(parser_token);
+        this.type = type;
+        this.isArray = isArray;
+    }
 
     public Type(String parser_token, String type) {
         super(parser_token);
         this.type = type;
+        this.isArray = false;
     }
 
-    abstract int getByteSize();
+    abstract int getTypeSize();
+    int getByteSize()
+    {
+        if(isArray)
+            return 8;
+        return getTypeSize();
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -69,13 +83,16 @@ abstract class Type extends Token {
 
         Type type1 = (Type) o;
 
+        if (isArray != type1.isArray) return false;
         return type != null ? type.equals(type1.type) : type1.type == null;
 
     }
 
     @Override
     public int hashCode() {
-        return type != null ? type.hashCode() : 0;
+        int result = type != null ? type.hashCode() : 0;
+        result = 31 * result + (isArray ? 1 : 0);
+        return result;
     }
 
     abstract String typeToVMStr();
@@ -88,7 +105,9 @@ class PrimitiveType extends Type {
         super(parser_token, type);
     }
 
-    public int getByteSize() {
+    public int getTypeSize() {
+        if (isArray)
+            return 4;
         switch (type) {
             case "string":
                 return 4;

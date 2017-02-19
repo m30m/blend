@@ -1,6 +1,6 @@
 structure position {
     int x;
-    int y;
+    array int y;
 }
 
 structure person {
@@ -25,7 +25,9 @@ function (bool, int) dummy(int k) {
 }
 
 function (void) main() {
-    char c;
-    read(c);
-    write(c);
+    position salam;
+    array int xx := [10] assign;
+    salam := assign<123,xx>;
+    salam.y[3]:=34;
+    write(xx[3]);
 }

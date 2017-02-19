@@ -59,7 +59,7 @@ class StructType extends Type {
 
 
     @Override
-    public int getByteSize() {
+    public int getTypeSize() {
         return 4;
     }
 
@@ -207,6 +207,12 @@ public class CodeGenerator {
                 sstack.push(currentToken);
                 break;
             }
+            case "pushArrayType": {
+                Type t = (Type) currentToken;
+                t.isArray = true;
+                sstack.push(currentToken);
+                break;
+            }
             case "pushId": {
                 if (currentFunction != null && currentFunction.containsKey((Identifier) currentToken))
                     sstack.push(currentFunction.getVariable((Identifier) currentToken));
@@ -244,7 +250,7 @@ public class CodeGenerator {
                 } else {
                     Variable variable = currentFunction.addVariable(t, id);
                     sstack.push(variable);
-                    if (t instanceof StructType) {
+                    if ((t instanceof StructType) || t.isArray) {
                         assign(makeConst(0), variable);
                     }
                 }
@@ -264,7 +270,7 @@ public class CodeGenerator {
                         assign((Variable) tuple1.get(i), tuple2.get(i));
                     }
                     sstack.push(tuple2);
-                } else if (!sstack.peek().equals("struct_assign_fin")) {//struct assignment is handled elsewhere
+                } else if (!sstack.peek().equals("struct_assign_fin") && !sstack.peek().equals("array_assign_fin")) {//assignment is handled elsewhere
                     Variable opr1 = (Variable) sstack.pop();
                     Object assigned_var = sstack.pop();
                     assign(opr1, assigned_var);
@@ -275,7 +281,7 @@ public class CodeGenerator {
             case "assignDeclared": {
                 if (insideFuncDef || insideStructDef)
                     throw new RuntimeException("Can't assign variable inside declaration");
-                if (sstack.peek().equals("struct_assign_fin")) {//struct assignment is handled elsewhere
+                if (sstack.peek().equals("struct_assign_fin") || sstack.peek().equals("array_assign_fin")) {//assignment is handled elsewhere
                     break;
                 }
                 Variable value = (Variable) sstack.pop();
@@ -447,7 +453,7 @@ public class CodeGenerator {
                     if (args.size() != 1)
                         throw new RuntimeException("isvoid function gets only one parameter");
                     Variable writeVar = args.get(0);
-                    if(!(writeVar.type instanceof StructType)) // and array
+                    if (!(writeVar.type instanceof StructType) && !writeVar.type.isArray) // and array
                     {
                         sstack.push(makeConst(new Literal("const", "BOOL", "false")));//result of isvoid
                     }
@@ -628,7 +634,9 @@ public class CodeGenerator {
                 StructType structType = (StructType) structVar.type;
                 Identifier id = (Identifier) currentToken;
                 makeIns("+", makeConst(structType.getFieldOffset(id)), structVar, AX);
-                sstack.push(new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, structType.getFieldType(id), AX.value));
+                Variable tempInt = currentFunction.getTemp(structType.getFieldType(id));
+                assign(new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, structType.getFieldType(id), AX.value), tempInt);
+                sstack.push(tempInt);
                 break;
             }
 
@@ -656,14 +664,60 @@ public class CodeGenerator {
             }
             case "releaseId": {
                 Variable relVar = getVariableFromId(currentToken);
-                if (!(relVar.type instanceof StructType)) // and array
-                    throw new RuntimeException("Can' release this kind of variable");
-                else {
+                if (relVar.type instanceof StructType) { // and array
                     StructType structType = (StructType) relVar.type;
                     makeIns("gmm", relVar, makeConst(structType.getStructSize()));
                     assign(makeConst(0), relVar);
+                } else if (relVar.type.isArray) {
+                    makeIns("gmm", relVar, getArraySizeVar(relVar));
+                    assign(makeConst(0), relVar);
+                } else {
+                    throw new RuntimeException("Can' release this kind of variable");
                 }
                 sstack.push("dummy");//dummy for STMTFin
+                break;
+            }
+            case "assignArrayStart": {
+                sstack.push("array_start");
+                break;
+            }
+            case "assignArrayEnd": {
+
+                ArrayList<Variable> dims = new ArrayList<>();
+                while (!sstack.peek().equals("array_start"))//reading dimensions
+                    dims.add(0, (Variable) sstack.pop());
+                sstack.pop();//pop array_start
+                Variable arrayVar = (Variable) sstack.pop();
+                if (dims.size() != 1)
+                    throw new RuntimeException("Incorrect dimensions");
+                Variable size = dims.get(0);
+                makeIns("*", size, makeConst(arrayVar.type.getTypeSize()), AX);
+                assign(AX, getArraySizeVar(arrayVar));
+                makeIns("gmm", AX, arrayVar);
+                sstack.push("array_assign_fin");
+                break;
+            }
+            case "startIndex": {
+                sstack.push("index_start");
+                break;
+            }
+            case "addIndex": {
+                break;
+            }
+            case "finishIndex": {
+                ArrayList<Variable> dims = new ArrayList<>();
+                while (!sstack.peek().equals("index_start"))//reading dimensions
+                    dims.add(0, (Variable) sstack.pop());
+                sstack.pop();//pop index_start
+                if (dims.size() != 1)
+                    throw new RuntimeException("Incorrect dimensions");
+                Variable arrayVar = (Variable) sstack.pop();
+                Variable offset = dims.get(0);
+                if (!arrayVar.type.isArray)
+                    throw new RuntimeException("Variable type is not array");
+                makeIns("*", makeConst(arrayVar.type.getTypeSize()), offset, AX);
+                makeIns("+", AX, arrayVar, AX);
+                sstack.push(new Variable(Variable.ADDR_MODE.GLOBAL_INDIRECT, arrayVar.type, AX.value));
                 break;
             }
 
@@ -778,6 +832,10 @@ public class CodeGenerator {
             }
 
         }
+    }
+
+    private Variable getArraySizeVar(Variable arrayVar) {
+        return new Variable(arrayVar.mode, intType, Integer.valueOf(arrayVar.value) + 4);
     }
 
     private void finishStructAssign() {
@@ -971,7 +1029,12 @@ public class CodeGenerator {
     void assign(Variable opr1, Object _opr2) {
         Variable opr2;
         opr2 = getVariableFromId(_opr2);
+        if (opr1.type.isArray != opr2.type.isArray) {
+            throw new RuntimeException("One type is array and another is not, can't assign them to each other");
+        }
         makeIns(":=", opr1, opr2);
+        if (opr1.type.isArray)
+            makeIns(":=", getArraySizeVar(opr1), getArraySizeVar(opr2));
     }
 
     private Variable getVariableFromId(Object _opr2) {

@@ -9,6 +9,7 @@ public class Program {
     public static String inputPath = "";
     public static String outputPath = "";
     public static String resPath = "";
+    public static int compileResult = 1;
 
     public static void main(String[] args) {
 
@@ -78,32 +79,50 @@ public class Program {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                compileResult = 0;
             }
 
         } catch (Exception ex) {
             System.out.println("Compile Error -> " + ex.getMessage());
+            writeResFile(0);
+            writeDummyOutFile();
             return;
         }
 
-        Parser parser = new Parser(inputPath, symbols, parseTable);
-        int compileResult = 1;
+        Parser parser = null;
+        try {
+            parser = new Parser(inputPath, symbols, parseTable);
+        } catch (Exception e) {
+            e.printStackTrace();
+            compileResult = 0;
+        }
+
         try {
             parser.Parse();
         } catch (Exception ex) {
             compileResult = 0;
-            //System.out.println("Compile Error -> " + ex.getMessage());
+            System.out.println("Compile Error -> " + ex.getMessage());
         }
         parser.WriteOutput(outputPath);
+        writeResFile(compileResult);
+    }
 
-        {
-            try {
-                PrintWriter writer = new PrintWriter(resPath, "UTF-8");
-                Identifier id = new Identifier("id", "main");
-                writer.print(compileResult);
-                writer.close();
-            } catch (IOException e) {
-                // do something
-            }
+    private static void writeResFile(int compileResult) {
+        try {
+            PrintWriter writer = new PrintWriter(resPath, "UTF-8");
+            writer.print(compileResult);
+            writer.close();
+        } catch (IOException e) {
+            // do something
+        }
+    }
+
+    private static void writeDummyOutFile() {
+        try {
+            PrintWriter writer = new PrintWriter(outputPath, "UTF-8");
+            writer.close();
+        } catch (IOException e) {
+            // do something
         }
     }
 

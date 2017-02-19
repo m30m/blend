@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.Reader;
 import java.util.Stack;
 
@@ -11,7 +12,7 @@ public class Parser {
     String[] symbols;
     Token currentToken;
 
-    public Parser(String inputFile, String[] symbols, PTBlock[][] parseTable) {
+    public Parser(String inputFile, String[] symbols, PTBlock[][] parseTable) throws Exception {
         try {
             this.parseTable = parseTable;
             this.symbols = symbols;
@@ -28,6 +29,7 @@ public class Parser {
             cg = new CodeGenerator(scanner);
         } catch (Exception e) {
             e.printStackTrace();
+            throw e;
         }
     }
 
@@ -35,7 +37,7 @@ public class Parser {
         return scanner.lineNumber(); // Or any other name you used in your Scanner
     }
 
-    public void Parse() {
+    public void Parse() throws Exception {
         try {
             int tokenId = nextTokenID();
             int curNode = 0;
@@ -82,23 +84,23 @@ public class Parser {
             cg.FinishCode();
         } catch (Exception e) {
             e.printStackTrace();
-            return;
+            throw e;
         }
     }
 
-    int nextTokenID() {
+    int nextTokenID() throws Exception {
         try {
             currentToken = scanner.NextToken();
         } catch (Exception e) {
             e.printStackTrace();
+            throw e;
         }
         int i;
         for (i = 0; i < symbols.length; i++) {
             if (symbols[i].equals(currentToken.parser_token))
                 return i;
         }
-        (new Exception("Undefined token: " + currentToken.parser_token)).printStackTrace();
-        return 0;
+        throw new Exception("Undefined token: " + currentToken.parser_token);
     }
 
     public void WriteOutput(String outputFile) // You can change this function, if you think it is not comfortable

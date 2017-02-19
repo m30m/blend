@@ -92,8 +92,8 @@ public class CodeGenerator {
     Variable FUNCTION_RESULT;
     static Type intType = new PrimitiveType("type", "int");
     static Type boolType = new PrimitiveType("type", "bool");
-    static Type realype = new PrimitiveType("type", "real");
     static Type charType = new PrimitiveType("type", "char");
+    static Type stringType = new PrimitiveType("type", "string");
 
     Stack<Object> sstack;
 
@@ -163,7 +163,7 @@ public class CodeGenerator {
     }
 
     public void Generate(String sem, Token currentToken) {
-        //System.out.println(sem); // Just for debug
+        System.out.println(sem); // Just for debug
 
         switch (sem) {
             case "NoSem":
@@ -455,6 +455,7 @@ public class CodeGenerator {
                             makeIns("wf", writeVar);
                             break;
                         case "char":
+                        case "string":
                             makeIns("wt", writeVar);
                             break;
                         case "bool":
@@ -706,8 +707,8 @@ public class CodeGenerator {
                     dims.add(0, (Variable) sstack.pop());
                 sstack.pop();//pop array_start
                 Variable arrayVar = (Variable) sstack.pop();
-                if (dims.size() != 1)
-                    throw new RuntimeException("Incorrect dimensions");
+//                if (dims.size() != 1)
+//                    throw new RuntimeException("Incorrect dimensions");
                 Variable size = dims.get(0);
                 makeIns("*", size, makeConst(arrayVar.type.getTypeSize()), AX);
                 assign(AX, getArraySizeVar(arrayVar));
@@ -727,8 +728,8 @@ public class CodeGenerator {
                 while (!sstack.peek().equals("index_start"))//reading dimensions
                     dims.add(0, (Variable) sstack.pop());
                 sstack.pop();//pop index_start
-                if (dims.size() != 1)
-                    throw new RuntimeException("Incorrect dimensions");
+//                if (dims.size() != 1)
+//                    throw new RuntimeException("Incorrect dimensions");
                 Variable arrayVar = (Variable) sstack.pop();
                 Variable offset = dims.get(0);
                 if (!arrayVar.type.isArray)
@@ -920,6 +921,10 @@ public class CodeGenerator {
                 else
                     throw new RuntimeException("Boolean with value other than true or false");
             }
+            case "STRING":
+            {
+                return new Variable(Variable.ADDR_MODE.IMMEDIATE, stringType, currentToken.value);
+            }
         }
         throw new RuntimeException("Unknown type for const: " + currentToken.type);
     }
@@ -1047,9 +1052,6 @@ public class CodeGenerator {
     void assign(Variable opr1, Object _opr2) {
         Variable opr2;
         opr2 = getVariableFromId(_opr2);
-        if (opr1.type.isArray != opr2.type.isArray) {
-            throw new RuntimeException("One type is array and another is not, can't assign them to each other");
-        }
         makeIns(":=", opr1, opr2);
         if (opr1.type.isArray)
             makeIns(":=", getArraySizeVar(opr1), getArraySizeVar(opr2));

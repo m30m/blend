@@ -88,6 +88,7 @@ public class CodeGenerator {
     Variable AX;
     Variable TMP_BOOL; // used for switch case
     Variable TMP_CHAR;
+    Variable TMP_INT;
     Variable FUNCTION_RESULT;
     static Type intType = new PrimitiveType("type", "int");
     static Type boolType = new PrimitiveType("type", "bool");
@@ -117,7 +118,8 @@ public class CodeGenerator {
         this.AX = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 4);
         this.FUNCTION_RESULT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 8);
         this.TMP_BOOL = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, boolType, 12);
-        this.TMP_CHAR = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, new PrimitiveType("type", "char"), 13);
+        this.TMP_CHAR = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, charType, 13);
+        this.TMP_INT = new Variable(Variable.ADDR_MODE.GLOBAL_DIRECT, intType, 14);
         this.currentFunction = null;
         makeIns("jmp", makeConst(0));//the value of jmp is not important since it will be overwritten in the end
     }
@@ -181,7 +183,15 @@ public class CodeGenerator {
                 Variable tempBool = currentFunction.getTempBool();
                 Variable op2 = (Variable) sstack.pop();
                 Variable op1 = (Variable) sstack.pop();
-                makeIns(opToString(sem), op1, op2, tempBool);
+                if (op1.type.type.equals("char") || op2.type.type.equals("char")) {
+                    assign(makeConst(0), AX);
+                    assign(makeConst(0), TMP_INT);
+                    assign(op1, AX);
+                    assign(op2, TMP_INT);
+                    makeIns(opToString(sem), AX, TMP_INT, TMP_INT);
+                    assign(TMP_INT, tempBool);
+                } else
+                    makeIns(opToString(sem), op1, op2, tempBool);
                 sstack.push(tempBool);
                 break;
             }
@@ -199,7 +209,15 @@ public class CodeGenerator {
                 Variable op2 = (Variable) sstack.pop();
                 Variable op1 = (Variable) sstack.pop();
                 Variable tempInt = currentFunction.getTemp(op1.type);
-                makeIns(opToString(sem), op1, op2, tempInt);
+                if (op1.type.type.equals("char") || op2.type.type.equals("char")) {
+                    assign(makeConst(0), AX);
+                    assign(makeConst(0), TMP_INT);
+                    assign(op1, AX);
+                    assign(op2, TMP_INT);
+                    makeIns(opToString(sem), AX, TMP_INT, TMP_INT);
+                    assign(TMP_INT, tempInt);
+                } else
+                    makeIns(opToString(sem), op1, op2, tempInt);
                 sstack.push(tempInt);
                 break;
             }
